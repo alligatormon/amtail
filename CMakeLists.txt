@@ -13,7 +13,7 @@ set(HEAD ${PROJECT_NAME})
 set(CMAKE_C_FLAGS "-Werror -Wall -Wno-implicit-function-declaration -Wno-char-subscripts -Wno-error=format-extra-args -Wno-error=format -Wno-variadic-macros -Wno-error=unused-result -Wno-undef -Wunreachable-code -Wno-unreachable-code -O3 -std=gnu11 -pthread -pg")
 include_directories(/usr/include)
 include_directories(/usr/local/include)
-include_directories(../../src)
+include_directories(../alligator/src)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
@@ -38,10 +38,10 @@ add_executable(${HEAD} test.c
     generator.c
     file.c
     selector.c
-    ../../src/dstructures/tommy.c
-    ../../src/dstructures/tommyds/tommyds/tommyhash.c
-    ../../src/dstructures/tommyds/tommyds/tommyhashdyn.c
-    ../../src/dstructures/ht.c
+    ../alligator/src/dstructures/tommy.c
+    ../alligator/src/dstructures/tommyds/tommyds/tommyhash.c
+    ../alligator/src/dstructures/tommyds/tommyds/tommyhashdyn.c
+    ../alligator/src/dstructures/ht.c
     compile.c
     lex.c
     parser.c
