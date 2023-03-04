@@ -1,0 +1,8 @@
+[requires]
+pcre/8.45
+
+[generators]
+CMakeDeps
+
+#[options]
+#pcre:with_jit=True
