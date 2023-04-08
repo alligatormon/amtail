@@ -10,7 +10,7 @@
 #define AMTAIL_AST_RIGHT 1
 
 #define AMTAIL_AST_OPCODE_NOOP 0
-#define AMTAIL_AST_OPCODE_VARIABLE 1
+#define AMTAIL_AST_OPCODE_VARIABLE 1 // create variable
 #define AMTAIL_AST_OPCODE_BRANCH 2
 #define AMTAIL_AST_OPCODE_INC 3
 #define AMTAIL_AST_OPCODE_DEC 4
@@ -19,10 +19,10 @@
 #define AMTAIL_AST_OPCODE_FUNC_STOP 7
 #define AMTAIL_AST_OPCODE_FUNC_MATCH 8
 #define AMTAIL_AST_OPCODE_FUNC_CMP 9 // compare and set match register
-#define AMTAIL_AST_OPCODE_FUNC_JNM 10 // jump if no match
+//#define AMTAIL_AST_OPCODE_FUNC_JNM 10 // jump if no match
 #define AMTAIL_AST_OPCODE_FUNC_JMP 10 // unconditional jump
-#define AMTAIL_AST_OPCODE_PLUS 11
-#define AMTAIL_AST_OPCODE_MINUS 12
+#define AMTAIL_AST_OPCODE_ADD 11
+#define AMTAIL_AST_OPCODE_SUB 12
 #define AMTAIL_AST_OPCODE_MUL 13
 #define AMTAIL_AST_OPCODE_DIV 14
 #define AMTAIL_AST_OPCODE_MOD 15
@@ -52,6 +52,8 @@
 #define AMTAIL_AST_OPCODE_FUNC_STRING 39 // string
 #define AMTAIL_AST_OPCODE_FUNC_SUBST 40 //subst
 #define AMTAIL_AST_OPCODE_REGEX 41
+#define AMTAIL_AST_OPCODE_VAR 42 // use variable
+#define AMTAIL_AST_OPCODE_RUN 43 // expression is ended, should be calculate and assign
 
 typedef struct amtail_ast {
 	enum { gauge, counter } tag;
@@ -73,6 +75,25 @@ typedef struct amtail_ast {
 	struct amtail_ast *prev; //for stack
 } amtail_ast;
 
+typedef struct calculation_t {
+	union {
+		double dvalue;
+		int64_t ivalue;
+		string *svalue;
+	};
+    uint8_t vartype;
+} calculation_t;
+
+typedef struct calculation_cluster {
+    calculation_t *queue;
+    char *stack;
+    uint64_t qcur;
+    uint64_t scur;
+    uint64_t qmax;
+    uint64_t smax;
+} calculation_cluster;
+
 amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level amtail_ll);
 void amtail_ast_free(amtail_ast *ast);
 void amtail_ast_print(amtail_ast *ast, uint64_t indent);
+char *opname_from_code(uint64_t opcode);

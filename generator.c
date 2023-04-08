@@ -68,6 +68,22 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
             printf("try to compile regexp: %p: '%s'\n", fill->re_match, fill->export_name->s + 1);
     }
 
+    if (fill->opcode == AMTAIL_AST_OPCODE_VAR)
+    {
+        if (ast->vartype == ALLIGATOR_VARTYPE_COUNTER)
+        {
+            fill->li = ast->ivalue;
+            if (amtail_ll.generator > 0)
+                printf("assign integer: %p: '%s' -> %"PRId64"\n", fill, fill->export_name->s, fill->li);
+        }
+        else if (ast->vartype == ALLIGATOR_VARTYPE_GAUGE)
+        {
+            fill->ld = ast->dvalue;
+            if (amtail_ll.generator > 0)
+                printf("assign double: %p: '%s' -> %lf\n", fill, fill->export_name->s, fill->ld);
+        }
+    }
+
 	++byte_code->l;
 }
 

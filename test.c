@@ -24,9 +24,9 @@ void run_tests_file(char *dir, char *file, char *log_filename)
 {
 	string *str = string_init_dup(dir);
 	amtail_log_level amtail_ll = {
-		.parser = 1,
-		.lexer = 1,
-        .generator = 1,
+		.parser = 0,
+		.lexer = 0,
+        .generator = 0,
 		.compiler = 0,
 	};
 	amtail_bytecode* byte_code = amtail_compile(file, str, amtail_ll);
@@ -36,7 +36,7 @@ void run_tests_file(char *dir, char *file, char *log_filename)
     //string_tokens *logline = readlogfile(log_filename);
 
     amtail_bytecode_dump(byte_code);
-    exit(0);
+    //exit(0);
 	amtail_run(byte_code, logline);
 
 	amtail_variables_dump(byte_code->variables);
@@ -50,7 +50,7 @@ void run_tests_file(char *dir, char *file, char *log_filename)
 int main()
 {
 	amtail_vm_init();
-	run_tests_file("tests/nginx.mtail", "nginx.mtail", "log/test.log");
+	run_tests_file("tests/nginx.mtail", "nginx.mtail", "log/test2.log");
 	//string *logline = string_init_alloc("test 1", 6);
 	//run_tests("tests/apache_combined.mtail", "apache_combined.mtail", logline);
 	//run_tests("tests/apache_common.mtail", "apache_common.mtail");

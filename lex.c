@@ -12,38 +12,7 @@
 #include "file.h"
 #define OPLEN 255
 
-//typedef struct { 
-//	int fd;
-//	char *path;
-//	int size;
-//	char *mem;
-//	struct stat st;
-//} file;
-//
-//file *readfile(char *path)
-//{
-//	file *a = calloc(1, sizeof(file));
-//	a->path = path;
-//	a->fd = open(a->path,O_RDONLY);
-//	if (a->fd < 0)
-//		return 0;
-//
-//	fstat(a->fd, &a->st);
-//	a->size=a->st.st_size;
-//	a->mem=calloc(1, a->size);
-//	read(a->fd, a->mem, a->size);
-//
-//	return a;
-//}
-//
-//void releasefile(file *a)
-//{
-//	free(a->mem);
-//	close(a->fd);
-//	free(a);
-//}
-
-char *strmbtok(char *input, char **inout, uint64_t *size, char *delimit, char *openblock, char *closeblock)
+char *strmbtok(char *input, char **inout, uint64_t *size, char *delimit, char *openblock, char *closeblock, uint8_t *is_expression, amtail_log_level amtail_ll)
 {
 	*size = 0;
 	char *token = input;
@@ -74,7 +43,10 @@ char *strmbtok(char *input, char **inout, uint64_t *size, char *delimit, char *o
 		if (!*token)
 		{
 			*size = *inout - input;
-			//printf("exit 0: '%s'\n", strndup(token-3, 3));
+
+			if (amtail_ll.lexer > 1)
+				printf("exit 0: '%s'\n", strndup(token-3, 3));
+
 			break;
 		}
 
@@ -83,23 +55,27 @@ char *strmbtok(char *input, char **inout, uint64_t *size, char *delimit, char *o
 
 		if (iBlock)
 		{
-			if ((closeblock[iBlockIndex] == *token) && (token[-1] != '\\') && (!quotas))
+			if ((closeblock[iBlockIndex] == *token) && (token[-1] != '\\') && (!quotas) && (!*is_expression))
 				iBlock = 0;
 
 			++token;
 			continue;
 		}
-		if (((block = strchr(openblock, *token)) != NULL) && first)
+		if (((block = strchr(openblock, *token)) != NULL) && first &&  (!*is_expression))
 		{
-			//printf("\ttoken '%c', token pre: '%c'\n", *token, token[-1]);
+			if (amtail_ll.lexer > 1)
+				printf("\ttoken '%c', token pre: '%c'\n", *token, token[-1]);
+
 			iBlock = 1;
 			iBlockIndex = block - openblock;
 			++token;
 			continue;
 		}
-		if (((block = strchr(openblock, *token)) != NULL) && !first && (token[-1] != '\\') && (!quotas))
+		if (((block = strchr(openblock, *token)) != NULL) && !first && (token[-1] != '\\') && (!quotas) && (!*is_expression))
 		{
-			//printf("\ttoken '%c', token pre: '%c'\n", *token, token[-1]);
+			if (amtail_ll.lexer > 1)
+				printf("\ttoken '%c', token pre: '%c'\n", *token, token[-1]);
+
 			iBlock = 1;
 			iBlockIndex = block - openblock;
 			++token;
@@ -112,7 +88,8 @@ char *strmbtok(char *input, char **inout, uint64_t *size, char *delimit, char *o
 			++token;
 			*inout = token;
 
-			//printf("exit 1: '%s'\n", strndup(token, 10));
+			if (amtail_ll.lexer > 1)
+				printf("exit 1: '%s'\n", strndup(token, 10));
 			break;
 		}
 
@@ -139,16 +116,21 @@ char *strmbtok(char *input, char **inout, uint64_t *size, char *delimit, char *o
 }
 
 
-void strmbtok_amtail_parser(char *inp, string_tokens *st, char *openblock, char *closeblock, char *name)
+void strmbtok_amtail_parser(char *inp, string_tokens *st, char *openblock, char *closeblock, char *name, amtail_log_level amtail_ll)
 {
 	char *ltoken, *token;
 	uint64_t sz;
 
-	while ((ltoken = strmbtok (inp, &inp, &sz, "\n", openblock, closeblock)) != NULL)
+	uint8_t glob_expression = 0;
+	while ((ltoken = strmbtok (inp, &inp, &sz, "\n", openblock, closeblock, &glob_expression, amtail_ll)) != NULL)
 	{
 		char *word = ltoken;
-		//printf("\tTOK: '%s'\n", ltoken);
-		while ((token = strmbtok(word, &word, &sz, " \t", openblock, closeblock)))
+		uint8_t is_expression = 0;
+
+		if (amtail_ll.lexer > 0)
+			printf("\tTOK: '%s'\n", ltoken);
+
+		while ((token = strmbtok(word, &word, &sz, " \t\n", openblock, closeblock, &is_expression, amtail_ll)))
 		{
 			// skip comment
 			if (!strncmp(token, "#", 1))
@@ -156,24 +138,37 @@ void strmbtok_amtail_parser(char *inp, string_tokens *st, char *openblock, char 
 
 			if (sz < 1)
 			{
-				//printf("NO SIZE: '%s' (%zu)\n", token, sz);
+				if (amtail_ll.lexer > 0)
+					printf("NO SIZE: '%s' (%llu)\n", token, sz);
 				continue;
 			}
 
-			//printf("FILE %s TOKEN SIZE: '%s' (%zu)\n", name, token, sz);
+			if (*token == '=' && sz == 1)
+				is_expression = 1;
+
+			if (amtail_ll.lexer > 0)
+				printf("FILE %s TOKEN SIZE: '%s' (%llu) expr: %d\n", name, token, sz, is_expression);
+
 			string_tokens_push(st, strdup(token), sz);
+
 		}
 		string_tokens_push(st, strdup("\n"), 1);
+		is_expression = 0;
 	}
 }
 
 string_tokens* amtail_lex(string *arg, char *name, amtail_log_level amtail_ll)
 {
+	if (amtail_ll.lexer > 0)
+		printf("=======\nstart lexer\n========");
 	file *a = readfile(arg->s);
 
 	string_tokens *st = string_tokens_new();
-	strmbtok_amtail_parser(a->mem, st, "/", "/", name);
+	strmbtok_amtail_parser(a->mem, st, "/", "/", name, amtail_ll);
 
 	releasefile(a);
+
+	if (amtail_ll.lexer > 0)
+		printf("=======\nend lexer\n========");
 	return st;
 }

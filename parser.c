@@ -184,6 +184,135 @@ void amtail_parser_print_stack(string_tokens* tokens, uint64_t i)
 	}
 }
 
+// shinkin yard start
+calculation_cluster* calculation_new(uint64_t size) {
+	calculation_cluster *ret = calloc(1, sizeof(*ret));
+	ret->qmax = size;
+	ret->queue = calloc(1, size * sizeof(*ret->queue));
+	ret->qcur = 0;
+	ret->stack = calloc(1, size);
+	ret->smax = size;
+	ret->scur = 0;
+
+	printf("CC return %p\n", ret);
+	return ret;
+}
+
+void calculation_push_queue(calculation_cluster *calculation_expr, char *str, size_t len) {
+	printf("\tcalculation_push_queue is %p, ll is %llu\n", calculation_expr, calculation_expr->qcur);
+	calculation_expr->queue[calculation_expr->qcur].svalue = string_init_alloc(str, len);
+	calculation_expr->queue[calculation_expr->qcur].vartype = ALLIGATOR_VARTYPE_TEXT;
+	++calculation_expr->qcur;
+}
+
+void calculation_push_stack(calculation_cluster *calculation_expr, char str) {
+	printf("\tcalculation_push_stack is %p, ll is %llu, sym '%c'\n", calculation_expr, calculation_expr->scur, str);
+	calculation_expr->stack[calculation_expr->scur++] = str;
+}
+
+char calculation_pop_stack(calculation_cluster *calculation_expr) {
+	printf("\tcalculation_pop_stack is %p, ll is %llu, pop sym: '%c'\n", calculation_expr, calculation_expr->scur, calculation_expr->stack[calculation_expr->scur-1]);
+	return calculation_expr->stack[--calculation_expr->scur];
+}
+
+char calculation_peek_stack(calculation_cluster *calculation_expr) {
+	printf("\tcalculation_pop_stack is %p, ll is %llu, peek sym: '%c'\n", calculation_expr, calculation_expr->scur, calculation_expr->stack[calculation_expr->scur-1]);
+	return calculation_expr->stack[calculation_expr->scur-1];
+}
+
+void calculation_del_queue(calculation_cluster *cc) {
+	printf("\tcc delete %p\n", cc);
+	for (uint64_t i = 0; i < cc->qmax; ++i)
+	{
+		if (cc->queue[i].vartype == ALLIGATOR_VARTYPE_TEXT)
+			string_free(cc->queue[i].svalue);
+	}
+
+	free(cc->stack);
+	free(cc);
+}
+void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack, amtail_ast **ccur) {
+	if (!*calculation_ptr)
+		return;
+
+	amtail_ast *cur = *ccur;
+
+	calculation_cluster *calculation_expr = *calculation_ptr;
+
+	for (uint64_t i = 0; i < calculation_expr->scur; ++i)
+		calculation_push_queue(calculation_expr, &calculation_expr->stack[i], 1);
+
+	printf("sval: ");
+	for (uint64_t i = 0; i < calculation_expr->qcur; ++i)
+	{
+		if (calculation_expr->queue[i].vartype == ALLIGATOR_VARTYPE_TEXT)
+		{
+			char *expr = calculation_expr->queue[i].svalue->s;
+			uint64_t size = calculation_expr->queue[i].svalue->l;
+			printf(" '%s' ", expr);
+			cur->name = string_init_alloc(expr, size);
+			if (*expr == '^')
+				cur->opcode = AMTAIL_AST_OPCODE_POW;
+			else if (*expr == '*')
+				cur->opcode = AMTAIL_AST_OPCODE_MUL;
+			else if (*expr == '/')
+				cur->opcode = AMTAIL_AST_OPCODE_DIV;
+			else if (*expr == '+')
+				cur->opcode = AMTAIL_AST_OPCODE_ADD;
+			else if (*expr == '-')
+				cur->opcode = AMTAIL_AST_OPCODE_SUB;
+			else
+			{
+				cur->opcode = AMTAIL_AST_OPCODE_VAR;
+
+
+				if (strstr(cur->name->s, ".")) // if float point number
+				{
+					cur->vartype = ALLIGATOR_VARTYPE_GAUGE;
+					cur->dvalue = strtod(cur->name->s, NULL);
+				}
+				else if (sscanf(cur->name->s, "%"PRId64, &cur->ivalue)) // otherwise if integer
+				{
+					cur->vartype = ALLIGATOR_VARTYPE_COUNTER;
+					cur->ivalue = strtoll(cur->name->s, NULL, 10);
+				}
+			}
+		}
+
+		amtail_ast_stack_push(stack, cur);
+		cur->stem = amtail_ast_multi_init(2);
+		cur = cur->stem[AMTAIL_AST_LEFT];
+	}
+	puts("");
+
+	cur->opcode = AMTAIL_AST_OPCODE_RUN;
+	amtail_ast_stack_push(stack, cur);
+	cur->stem = amtail_ast_multi_init(2);
+	cur = cur->stem[AMTAIL_AST_LEFT];
+
+	calculation_del_queue(calculation_expr);
+
+	*calculation_ptr = NULL;
+}
+
+int is_calculation_op(char op)
+{
+	if (
+		   (op == '_')
+		|| (op == '^')
+		|| (op == '*')
+		|| (op == '/')
+		|| (op == '%')
+		|| (op == '+')
+		|| (op == '-')
+		|| (op == '(')
+		|| (op == ')')
+	)
+		return 1;
+	return 0;
+}
+// shinkin yard end
+
 amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level amtail_ll)
 {
 	//amtail_ast *funcs = amtail_ast_init();
@@ -201,6 +330,20 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 	string *expr = string_new();
 	uint8_t hidden = 0;
 	uint8_t vartype = 0;
+	calculation_cluster *calculation_expr = NULL;
+	uint8_t calculation_op[255];
+	memset(calculation_op, 0, 255);
+	calculation_op['_'] = 10;
+	calculation_op['^'] = 9;
+	calculation_op['*'] = 8;
+	calculation_op['/'] = 8;
+	calculation_op['%'] = 8;
+	calculation_op['+'] = 5;
+	calculation_op['-'] = 5;
+	calculation_op['('] = 0;
+	calculation_op[')'] = 0;
+	//struct operator_type startop={'X', 0, ASSOC_NONE, 0, NULL};
+	char calculation_lastop = 0;
 
 	if (amtail_ll.parser)
 		puts("\t<====> PARSER STAGE <====>");
@@ -224,6 +367,7 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			cur->hidden = hidden;
 
 			hidden = 0;
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "gauge"))
 		{
@@ -238,6 +382,7 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			cur->hidden = hidden;
 
 			hidden = 0;
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "hidden"))
 		{
@@ -245,6 +390,7 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 				printf("name '%s', [%"PRIu64"] add parameter 'hidden'\n", cur->name->s, i);
 
 			hidden = 1;
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "as"))
 		{
@@ -285,6 +431,7 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			string_string_copy(cur->svalue, tokens->str[i]);
 
 			hidden = 0;
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "text"))
 		{
@@ -301,6 +448,7 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			cur->svalue = string_new();
 
 			hidden = 0;
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "def"))
 		{
@@ -314,46 +462,24 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			//string_string_cat(expr, tokens->str[i]);
 			cur->opcode = AMTAIL_AST_OPCODE_FUNC_DECLARATION;
 			expression = 0;
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (tokens->str[i]->s[0] != '/' && strstr(tokens->str[i]->s, "="))
 		{
-			cur->opcode = AMTAIL_AST_OPCODE_ASSIGN;
-			++i;
-
-			if ((strcmp(tokens->str[i - 1]->s, "+=")) || (strcmp(tokens->str[i]->s, "+")))
-			{
-				cur->opcode = AMTAIL_AST_OPCODE_PLUS;
-				cur->stem = amtail_ast_multi_init(2);
-				cur->stem[AMTAIL_AST_LEFT]->name = tokens->str[i - 1];
-				cur->stem[AMTAIL_AST_RIGHT]->name = tokens->str[i];
-			}
-
-			else if ((strcmp(tokens->str[i - 1]->s, "-=")) || (strcmp(tokens->str[i]->s, "-")))
-			{
-				cur->opcode = AMTAIL_AST_OPCODE_MINUS;
-				cur->stem = amtail_ast_multi_init(2);
-				cur->stem[AMTAIL_AST_LEFT]->name = tokens->str[i - 1];
-				cur->stem[AMTAIL_AST_RIGHT]->name = tokens->str[i];
-			}
-
-			else if ((strcmp(tokens->str[i - 1]->s, "/=")) || (strcmp(tokens->str[i]->s, "/")))
-			{
-				cur->opcode = AMTAIL_AST_OPCODE_DIV;
-				cur->stem = amtail_ast_multi_init(2);
-				cur->stem[AMTAIL_AST_LEFT]->name = tokens->str[i - 1];
-				cur->stem[AMTAIL_AST_RIGHT]->name = tokens->str[i];
-			}
-
-			else if ((strcmp(tokens->str[i - 1]->s, "*=")) || (strcmp(tokens->str[i]->s, "*")))
-			{
-				cur->opcode = AMTAIL_AST_OPCODE_MUL;
-				cur->stem = amtail_ast_multi_init(2);
-				cur->stem[AMTAIL_AST_LEFT]->name = tokens->str[i - 1];
-				cur->stem[AMTAIL_AST_RIGHT]->name = tokens->str[i];
-			}
-
+			calculation_expr = calculation_new(255);
+			expression = 0;
 			if (amtail_ll.parser > 0)
-				printf("calculation [%"PRIu64"]: '%s' type: %d\n", i, tokens->str[i]->s, cur->opcode);
+				printf("assign [%"PRIu64"]: '%s'\n", i, expr->s);
+
+			expression = 1;
+			cur->name = string_init_alloc(expr->s, expr->l);
+			cur->opcode = AMTAIL_AST_OPCODE_ASSIGN;
+
+			amtail_ast_stack_push(stack, cur);
+			cur->stem = amtail_ast_multi_init(2);
+			cur = cur->stem[AMTAIL_AST_LEFT];
+			string_null(expr);
+			//++i;
 		}
 		else if (tokens->str[i]->s[0] != '/' && strstr(tokens->str[i]->s, "++"))
 		{
@@ -388,11 +514,13 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 		{
 			if (amtail_ll.parser > 0)
 				printf("NEXT [%"PRIu64"]\n", i);
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "stop"))
 		{
 			if (amtail_ll.parser > 0)
 				printf("STOP [%"PRIu64"]\n", i);
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "else"))
 		{
@@ -400,6 +528,7 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 				printf("ELSE [%"PRIu64"]\n", i);
 
 			e_else = 1;
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "otherwise"))
 		{
@@ -407,11 +536,13 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 				printf("OTHERWISE [%"PRIu64"]\n", i);
 
 			otherwise = 1;
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "del"))
 		{
 			if (amtail_ll.parser > 0)
 				printf("DEL [%"PRIu64"]\n", i);
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "{"))
 		{
@@ -475,8 +606,9 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			else
 			{
 				if (amtail_ll.parser > 0)
-					puts("govno!");
+					puts("unknown!");
 			}
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (!strcmp(tokens->str[i]->s, "}"))
 		{
@@ -506,6 +638,7 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 				printf("%s POP cur %p/%p PP %p/%p %"PRIu64"\n", name, cur, cur->stem, cur->stem[AMTAIL_AST_LEFT], cur->stem[AMTAIL_AST_RIGHT], identy);
 
 			cur = cur->stem[AMTAIL_AST_RIGHT];
+			calculation_flush(&calculation_expr, stack, &cur);
 		}
 		else if (*tokens->str[i]->s == '@')
 		{
@@ -517,6 +650,38 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			cur->name = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l);
 			cur->opcode = AMTAIL_AST_OPCODE_FUNC_CALL;
 			expression = 0;
+		}
+		else if (calculation_expr)
+		{
+			if (amtail_ll.parser > 0)
+				printf("calculation [%"PRIu64"]: '%s' type: %d\n", i, tokens->str[i]->s, cur->opcode);
+
+			if (is_calculation_op(*tokens->str[i]->s))
+			{
+				char curop = calculation_op[*tokens->str[i]->s];
+				printf("> curop %d, calculation_lastop %d\n", curop, calculation_lastop);
+				if (curop < calculation_lastop)
+				{
+					while (curop < calculation_lastop)
+					{
+						char elem = calculation_pop_stack(calculation_expr);
+						calculation_push_queue(calculation_expr, &elem, 1);
+						calculation_lastop = calculation_op[calculation_peek_stack(calculation_expr)];
+						printf(">> curop %d, calculation_lastop %d\n", curop, calculation_lastop);
+					}
+					calculation_push_stack(calculation_expr, *tokens->str[i]->s);
+					calculation_lastop = curop;
+				}
+				else
+				{
+					calculation_push_stack(calculation_expr, *tokens->str[i]->s);
+					calculation_lastop = curop;
+				}
+			}
+			else
+			{
+				calculation_push_queue(calculation_expr, tokens->str[i]->s, tokens->str[i]->l);
+			}
 		}
 		else if (begin)
 		{
@@ -542,7 +707,9 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			begin = 1;
 		else
 			begin = 0;
+
 	}
+	calculation_flush(&calculation_expr, stack, &cur);
 
 	string_free(expr);
 
@@ -550,5 +717,55 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 		puts("\t<-----> END PARSER <----->");
 
 	return ast;
+}
+char *opname_from_code(uint64_t opcode) {
+	char *namecodes[256] = {
+		"AMTAIL_AST_OPCODE_NOOP",
+		"AMTAIL_AST_OPCODE_VARIABLE",
+		"AMTAIL_AST_OPCODE_BRANCH",
+		"AMTAIL_AST_OPCODE_INC",
+		"AMTAIL_AST_OPCODE_DEC",
+		"AMTAIL_AST_OPCODE_FUNC_DECLARATION",
+		"AMTAIL_AST_OPCODE_FUNC_CALL",
+		"AMTAIL_AST_OPCODE_FUNC_STOP",
+		"AMTAIL_AST_OPCODE_FUNC_MATCH",
+		"AMTAIL_AST_OPCODE_FUNC_CMP",
+		"AMTAIL_AST_OPCODE_FUNC_JMP",
+		"AMTAIL_AST_OPCODE_ADD",
+		"AMTAIL_AST_OPCODE_SUB",
+		"AMTAIL_AST_OPCODE_MUL",
+		"AMTAIL_AST_OPCODE_DIV",
+		"AMTAIL_AST_OPCODE_MOD",
+		"AMTAIL_AST_OPCODE_POW",
+		"AMTAIL_AST_OPCODE_ASSIGN",
+		"AMTAIL_AST_OPCODE_ADD_ASSIGN",
+		"AMTAIL_AST_OPCODE_MATCH",
+		"AMTAIL_AST_OPCODE_NOTMATCH",
+		"AMTAIL_AST_OPCODE_AND",
+		"AMTAIL_AST_OPCODE_OR",
+		"AMTAIL_AST_OPCODE_LT",
+		"AMTAIL_AST_OPCODE_GT",
+		"AMTAIL_AST_OPCODE_LE",
+		"AMTAIL_AST_OPCODE_GE",
+		"AMTAIL_AST_OPCODE_EQ",
+		"AMTAIL_AST_OPCODE_NE",
+		"AMTAIL_AST_OPCODE_FUNC_STRPTIME",
+		"AMTAIL_AST_OPCODE_FUNC_TIMESTAMP",
+		"AMTAIL_AST_OPCODE_FUNC_TOLOWER",
+		"AMTAIL_AST_OPCODE_FUNC_LEN",
+		"AMTAIL_AST_OPCODE_FUNC_STRTOL",
+		"AMTAIL_AST_OPCODE_FUNC_SETTIME",
+		"AMTAIL_AST_OPCODE_FUNC_GETFILENAME",
+		"AMTAIL_AST_OPCODE_FUNC_INT",
+		"AMTAIL_AST_OPCODE_FUNC_BOOL",
+		"AMTAIL_AST_OPCODE_FUNC_FLOAT",
+		"AMTAIL_AST_OPCODE_FUNC_STRING",
+		"AMTAIL_AST_OPCODE_FUNC_SUBST",
+		"AMTAIL_AST_OPCODE_REGEX",
+		"AMTAIL_AST_OPCODE_VAR",
+		"AMTAIL_AST_OPCODE_RUN",
+	};
+
+	return namecodes[opcode];
 }
 

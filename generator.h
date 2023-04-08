@@ -21,6 +21,7 @@ typedef struct amtail_byteop {
     //uint64_t jmp;
     regex_match *re_match;
 	uint64_t right_opcounter;
+    uint8_t allocated; // only if not a part of sequence of command
 } amtail_byteop;
 
 typedef struct amtail_bytecode {
