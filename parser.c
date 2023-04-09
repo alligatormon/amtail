@@ -199,7 +199,10 @@ calculation_cluster* calculation_new(uint64_t size) {
 }
 
 void calculation_push_queue(calculation_cluster *calculation_expr, char *str, size_t len) {
-	printf("\tcalculation_push_queue is %p, ll is %llu\n", calculation_expr, calculation_expr->qcur);
+	if (len == 1)
+		printf("\tcalculation_push_queue is %p, ll is %llu, '%c'(1)\n", calculation_expr, calculation_expr->qcur, *str);
+	else
+		printf("\tcalculation_push_queue is %p, ll is %llu, '%s'(%zu)\n", calculation_expr, calculation_expr->qcur, str, len);
 	calculation_expr->queue[calculation_expr->qcur].svalue = string_init_alloc(str, len);
 	calculation_expr->queue[calculation_expr->qcur].vartype = ALLIGATOR_VARTYPE_TEXT;
 	++calculation_expr->qcur;
@@ -212,11 +215,13 @@ void calculation_push_stack(calculation_cluster *calculation_expr, char str) {
 
 char calculation_pop_stack(calculation_cluster *calculation_expr) {
 	printf("\tcalculation_pop_stack is %p, ll is %llu, pop sym: '%c'\n", calculation_expr, calculation_expr->scur, calculation_expr->stack[calculation_expr->scur-1]);
+	if (calculation_expr->scur < 1)
+		return 0;
 	return calculation_expr->stack[--calculation_expr->scur];
 }
 
 char calculation_peek_stack(calculation_cluster *calculation_expr) {
-	printf("\tcalculation_pop_stack is %p, ll is %llu, peek sym: '%c'\n", calculation_expr, calculation_expr->scur, calculation_expr->stack[calculation_expr->scur-1]);
+	printf("\tcalculation_peek_stack is %p, ll is %llu, peek sym: '%c'\n", calculation_expr, calculation_expr->scur, calculation_expr->stack[calculation_expr->scur-1]);
 	return calculation_expr->stack[calculation_expr->scur-1];
 }
 
@@ -235,12 +240,20 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 	if (!*calculation_ptr)
 		return;
 
+	printf("calculation_flush!\n");
 	amtail_ast *cur = *ccur;
 
 	calculation_cluster *calculation_expr = *calculation_ptr;
 
-	for (uint64_t i = 0; i < calculation_expr->scur; ++i)
-		calculation_push_queue(calculation_expr, &calculation_expr->stack[i], 1);
+	char elem = 1;
+	while (elem != 0)
+	{
+		elem = calculation_pop_stack(calculation_expr);
+		if (!elem)
+			break;
+
+		calculation_push_queue(calculation_expr, &elem, 1);
+	}
 
 	printf("sval: ");
 	for (uint64_t i = 0; i < calculation_expr->qcur; ++i)
@@ -665,6 +678,9 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 					while (curop < calculation_lastop)
 					{
 						char elem = calculation_pop_stack(calculation_expr);
+						if (!elem)
+							break;
+
 						calculation_push_queue(calculation_expr, &elem, 1);
 						calculation_lastop = calculation_op[calculation_peek_stack(calculation_expr)];
 						printf(">> curop %d, calculation_lastop %d\n", curop, calculation_lastop);

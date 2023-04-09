@@ -63,8 +63,8 @@ void amtail_vmfunc_add(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 {
     printf("ADD !!!\n");
 
-    amtail_byteop *left = amtail_vmstack_pop(amt_thread);
     amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+    amtail_byteop *left = amtail_vmstack_pop(amt_thread);
     amtail_byteop *new = calloc(1, sizeof(*new));
     amtail_vmstack_push(amt_thread, new);
     new->allocated = 1;
@@ -91,15 +91,15 @@ void amtail_vmfunc_add(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
     {
         new->ld = left->ld + right->ld;
         new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-        printf("counter gauge adding: %lf and %lf\n", left->ld, right->ld);
+        printf("gauge gauge adding: %lf and %lf\n", left->ld, right->ld);
 	}
 }
 
 void amtail_vmfunc_mul(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
 {
 
-    amtail_byteop *left = amtail_vmstack_pop(amt_thread);
     amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+    amtail_byteop *left = amtail_vmstack_pop(amt_thread);
     amtail_byteop *new = calloc(1, sizeof(*new));
     printf("MUL: left %p, right %p, new %p\n", left, right, new);
     amtail_vmstack_push(amt_thread, new);
@@ -127,15 +127,15 @@ void amtail_vmfunc_mul(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
     {
         new->ld = left->ld * right->ld;
         new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-        printf("counter gauge nul: %lf and %lf = %lf\n", left->ld, right->ld, new->ld);
+        printf("gauge gauge nul: %lf and %lf = %lf\n", left->ld, right->ld, new->ld);
 	}
 }
 
 void amtail_vmfunc_pow(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
 {
 
-    amtail_byteop *left = amtail_vmstack_pop(amt_thread);
     amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+    amtail_byteop *left = amtail_vmstack_pop(amt_thread);
     amtail_byteop *new = calloc(1, sizeof(*new));
     printf("POW: left %p, right %p, new %p\n", left, right, new);
     amtail_vmstack_push(amt_thread, new);
@@ -145,33 +145,33 @@ void amtail_vmfunc_pow(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
     {
         new->li = pow(left->li, right->li);
         new->vartype = ALLIGATOR_VARTYPE_COUNTER;
-        printf("counter counter mul: %"PRId64" and %"PRId64" = %"PRIu64"\n", left->li, right->li, new->li);
+        printf("counter counter pow: %"PRId64" and %"PRId64" = %"PRIu64"\n", left->li, right->li, new->li);
     }
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
     {
         new->ld = pow(left->ld, right->li);
         new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-        printf("gauge counter mul: %lf and %"PRId64" = %lf\n", left->ld, right->li, new->ld);
+        printf("gauge counter pow: %lf and %"PRId64" = %lf\n", left->ld, right->li, new->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
     {
         new->ld = pow(left->li, right->ld);
         new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-        printf("counter gauge mul: %"PRId64" and %lf =  %lf\n", left->li, right->ld, new->ld);
+        printf("counter gauge pow: %"PRId64" and %lf =  %lf\n", left->li, right->ld, new->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
     {
         new->ld = pow(left->ld, right->ld);
         new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-        printf("counter gauge nul: %lf and %lf = %lf\n", left->ld, right->ld, new->ld);
+        printf("gauge gauge pow: %lf and %lf = %lf\n", left->ld, right->ld, new->ld);
 	}
 }
 
 void amtail_vmfunc_div(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
 {
 
-    amtail_byteop *left = amtail_vmstack_pop(amt_thread);
     amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+    amtail_byteop *left = amtail_vmstack_pop(amt_thread);
     amtail_byteop *new = calloc(1, sizeof(*new));
     printf("DIV: left %p, right %p, new %p, opcode %u\n", left, right, new, right->opcode);
     amtail_vmstack_push(amt_thread, new);
@@ -181,25 +181,25 @@ void amtail_vmfunc_div(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
     {
         new->li = left->li / right->li;
         new->vartype = ALLIGATOR_VARTYPE_COUNTER;
-        printf("counter counter mul: %"PRId64" and %"PRId64" = %"PRIu64"\n", left->li, right->li, new->li);
+        printf("counter counter div: %"PRId64" and %"PRId64" = %"PRIu64"\n", left->li, right->li, new->li);
     }
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
     {
         new->ld = left->ld / right->li;
         new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-        printf("gauge counter mul: %lf and %"PRId64" = %lf\n", left->ld, right->li, new->ld);
+        printf("gauge counter div: %lf and %"PRId64" = %lf\n", left->ld, right->li, new->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
     {
         new->ld = left->li / right->ld;
         new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-        printf("counter gauge mul: %"PRId64" and %lf =  %lf\n", left->li, right->ld, new->ld);
+        printf("counter gauge div: %"PRId64" and %lf =  %lf\n", left->li, right->ld, new->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
     {
         new->ld = left->ld / right->ld;
         new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-        printf("counter gauge nul: %lf and %lf = %lf\n", left->ld, right->ld, new->ld);
+        printf("gauge gauge div: %lf and %lf = %lf\n", left->ld, right->ld, new->ld);
 	}
 }
 
