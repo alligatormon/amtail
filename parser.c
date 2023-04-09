@@ -184,7 +184,7 @@ void amtail_parser_print_stack(string_tokens* tokens, uint64_t i)
 	}
 }
 
-// shinkin yard start
+// shunting yard start
 calculation_cluster* calculation_new(uint64_t size) {
 	calculation_cluster *ret = calloc(1, sizeof(*ret));
 	ret->qmax = size;
@@ -324,7 +324,7 @@ int is_calculation_op(char op)
 		return 1;
 	return 0;
 }
-// shinkin yard end
+// shunting yard end
 
 amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level amtail_ll)
 {
