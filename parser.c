@@ -418,8 +418,12 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			uint64_t j = 0;
 			for (++i; strcmp(tokens->str[i]->s, "\n"); ++i, ++j)
 			{
+                if (tokens->str[i]->s[tokens->str[i]->l-1] == ',')
+                    tokens->str[i]->s[--tokens->str[i]->l] = 0;
+
 				if (amtail_ll.parser > 0)
-					printf("by [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
+					printf("by [%"PRIu64"]: '%s'(%zu)\n", i, tokens->str[i]->s, tokens->str[i]->l);
+
 				cur->by[j] = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l);
 			}
 			cur->by_count = j;

@@ -18,6 +18,9 @@ typedef struct amtail_byteop {
 		string *rs;
 	};
 
+	uint8_t by_count;
+	string **by;
+
     //uint64_t jmp;
     regex_match *re_match;
 	uint64_t right_opcounter;

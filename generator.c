@@ -36,6 +36,15 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
 	fill->opcode = ast->opcode;
 	fill->vartype = ast->vartype;
 	fill->hidden = ast->hidden;
+	if (*ast->by)
+	{
+		fill->by_count = ast->by_count;
+		fill->by = calloc(1, sizeof(*fill->by) * ast->by_count);
+		for (uint64_t i = 0; i < ast->by_count; ++i)
+		{
+			fill->by[i] = string_init_alloc(ast->by[i]->s, ast->by[i]->l);
+		}
+	}
 
 	if (ast->vartype == ALLIGATOR_VARTYPE_CONST)
 	{
@@ -126,5 +135,16 @@ amtail_bytecode* amtail_code_generator(amtail_ast *ast, amtail_log_level amtail_
 
 void amtail_code_free(amtail_bytecode *byte_code)
 {
+	for (uint64_t i = 0; i < byte_code->l; ++i)
+	{
+		amtail_byteop *ops = &byte_code->ops[i];
+		if (ops->by_count)
+		{
+			for (uint64_t j = 0; j < ops->by_count; ++j)
+				string_free(ops->by[j]);
+
+			free(ops->by);
+		}
+	}
 	free(byte_code);
 }
