@@ -1,0 +1,37 @@
+# Copyright 2017 Pablo Carranza <pcarranza@gmail.com>. All Rights Reserved.
+# This file is available under the Apache license.
+#
+# Rails production log parsing
+
+counter rails_requests_started_total
+counter rails_requests_started by verb
+
+counter rails_requests_completed_total
+counter rails_requests_completed by status
+
+histogram rails_requests_completed_seconds by status buckets 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 15.0
+
+/^Started (?P<verb>[A-Z]+) .*/ {
+  ###
+  # Started HTTP requests by verb (GET, POST, etc.)
+  #
+  rails_requests_started_total++
+  rails_requests_started[$verb]++
+}
+
+/^Completed (?P<status>\d{3}) .+ in (?P<request_seconds>\d+)ms .*$/ {
+  ###
+  # Total numer of completed requests by status
+  #
+  rails_requests_completed_total++
+  rails_requests_completed[$status]++
+
+  ###
+  # Completed requests by status with histogram buckets
+  #
+  # These statements "fall through", so the histogram is cumulative.  The
+  # collecting system can compute the percentile bands by taking the ratio of
+  # each bucket value over the final bucket.
+
+  rails_requests_completed_seconds[$status] = $request_seconds / 1000.0
+}

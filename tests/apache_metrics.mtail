@@ -1,0 +1,47 @@
+# Copyright 2015 Ben Kochie <superq@gmail.com>. All Rights Reserved.
+# This file is available under the Apache license.
+
+# Parser for a metrics-friendly apache log format
+# LogFormat "%v:%p %R %m %>s %H conn=%X %D %O %I %k" metrics
+counter http_connections_aborted_total by server_port, handler, method, code, protocol, connection_status
+counter http_connections_closed_total by server_port, handler, method, code, protocol, connection_status
+
+counter http_request_size_bytes_total by server_port, handler, method, code, protocol
+counter http_response_size_bytes_total by server_port, handler, method, code, protocol
+
+histogram http_request_duration_seconds by server_port, handler, method, code, protocol buckets 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 15
+
+/^/ +
+/(?P<server_port>\S+) / + # %v:%p - The canonical ServerName of the server serving the request. : The canonical port of the server serving the request.
+/(?P<handler>\S+) / + # %R - The handler generating the response (if any).
+/(?P<method>[A-Z]+) / + # %m - The request method.
+/(?P<code>\d{3}) / + # %>s - Status code.
+/(?P<protocol>\S+) / + # %H - The request protocol.
+/(?P<connection_status>conn=.) / + # %X - Connection status when response is completed
+/(?P<time_us>\d+) / + # %D - The time taken to serve the request, in microseconds.
+/(?P<sent_bytes>\d+) / + # %O - Bytes sent, including headers.
+/(?P<received_bytes>\d+) / + # %I - Bytes received, including request and headers.
+/(?P<keepalives>\d+)/ + # %k - Number of keepalive requests handled on this connection.
+/$/ {
+  ###
+  # HTTP Requests with histogram buckets.
+  #
+  http_request_duration_seconds[$server_port][$handler][$method][$code][$protocol] = $time_us / 1000000.0
+
+  ###
+  # Sent/Received bytes.
+  http_response_size_bytes_total[$server_port][$handler][$method][$code][$protocol] += $sent_bytes
+  http_request_size_bytes_total[$server_port][$handler][$method][$code][$protocol] += $received_bytes
+
+  ### Connection status when response is completed:
+  # X = Connection aborted before the response completed.
+  # + = Connection may be kept alive after the response is sent.
+  # - = Connection will be closed after the response is sent.
+  / conn=X / {
+    http_connections_aborted_total[$server_port][$handler][$method][$code][$protocol][$connection_status]++
+  }
+  # Will not include all closed connections. :-(
+  / conn=- / {
+    http_connections_closed_total[$server_port][$handler][$method][$code][$protocol][$connection_status]++
+  }
+}
