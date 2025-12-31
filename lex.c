@@ -120,7 +120,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 }
 
 
-void strmbtok_amtail_parser(char *inp, string_tokens *st, char *openblock, char *closeblock, char *name, amtail_log_level amtail_ll)
+void strmbtok_amtail_lexer(char *inp, string_tokens *st, char *openblock, char *closeblock, char *name, amtail_log_level amtail_ll)
 {
 	char *start = inp;
 	char *ltoken;
@@ -171,7 +171,7 @@ string_tokens* amtail_lex(string *arg, char *name, amtail_log_level amtail_ll)
 
 	string_tokens *st = string_tokens_new();
 
-	strmbtok_amtail_parser(a->mem, st, "/'\"", "/'\"", name, amtail_ll);
+	strmbtok_amtail_lexer(a->mem, st, "/'\"", "/'\"", name, amtail_ll);
 
 	releasefile(a);
 
