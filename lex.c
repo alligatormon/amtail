@@ -12,7 +12,7 @@
 #include "file.h"
 #define OPLEN 255
 
-char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *delimit, char *openblock, char *closeblock, uint8_t *is_expression, amtail_log_level amtail_ll)
+char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *delimit, char *openblock, char *closeblock, uint8_t *is_expression, int8_t *bracket, amtail_log_level amtail_ll)
 {
 	*size = 0;
 	char *token = input;
@@ -93,6 +93,24 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			break;
 		}
 
+		if (*token == '(' && !*bracket && !iBlock) {
+			*size = *inout - input;
+			++token;
+			*inout = token;
+
+			*bracket = 1;
+			break;
+		}
+
+		if (*token == ')' && !iBlock && *bracket == 1) {
+			*size = *inout - input;
+			++token;
+			*inout = token;
+
+			*bracket = 0;
+			break;
+		}
+
 		if ((*token == '=') && !iBlock) {
 			*is_expression = 1;
 		}
@@ -128,15 +146,17 @@ void strmbtok_amtail_lexer(char *inp, string_tokens *st, char *openblock, char *
 	uint64_t sz;
 
 	uint8_t glob_expression = 0;
-	while ((ltoken = strmbtok (start, inp, &inp, &sz, "\n", openblock, closeblock, &glob_expression, amtail_ll)) != NULL)
+	int8_t glob_bracket = -1;
+	while ((ltoken = strmbtok (start, inp, &inp, &sz, "\n", openblock, closeblock, &glob_expression, &glob_bracket, amtail_ll)) != NULL)
 	{
 		char *word = ltoken;
 		uint8_t is_expression = 0;
+		int8_t is_bracket = 0;
 
 		if (amtail_ll.lexer > 0)
 			printf("\tTOK: '%s'\n", ltoken);
 
-		while ((token = strmbtok(start, word, &word, &sz, " \t\n(),", openblock, closeblock, &is_expression, amtail_ll)))
+		while ((token = strmbtok(start, word, &word, &sz, " \t\n,", openblock, closeblock, &is_expression, &is_bracket, amtail_ll)))
 		{
 			// skip comment
 			if (!strncmp(token, "#", 1))
@@ -157,6 +177,7 @@ void strmbtok_amtail_lexer(char *inp, string_tokens *st, char *openblock, char *
 
 			string_tokens_push(st, strdup(token), sz);
 		}
+
 		string_tokens_push(st, strdup("\n"), 1);
 		is_expression = 0;
 	}
@@ -202,7 +223,7 @@ void compare_mem_lines_with_tokens(char *mem, size_t mem_len, string_tokens *st)
 				string *tok = st->str[line_no];
 
 				if (string_eq(line, len, tok)) {
-					printf("OK[%lu]: '%s' != '%s'\n", line_no+1, tok->s, strndup(tok->s, len));
+					printf("OK[%lu]: '%s'(%zu) != '%s'\n", line_no+1, tok->s, tok->l, strndup(tok->s, len));
 				} else {
 					if (((len == 0) || (len == 1)) && (tok->l == 1) && (tok->s[0] == '\n') && (line[0] == '\n')) {
 						puts("OK: nl");
