@@ -7,19 +7,19 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 #include "common/selector.h"
-#include "sstring.h"
+//#include "sstring.h"
 #define DATATYPE_INT 1
 #define DATATYPE_UINT 2
 #define DATATYPE_DOUBLE 3
 #define u64 PRIu64
 #define d64 PRId64
 
-void stlencat(stlen *str, char *str2, size_t len)
-{
-	//printf("CONCAT '%p'(SSIZE %zu) + '%s' (SIZE %zu)\n", str->s, strlen(str->s), str2, len);
-	strncat(str->s, str2, len);
-	str->l += len;
-}
+//void stlencat(stlen *str, char *str2, size_t len)
+//{
+//	//printf("CONCAT '%p'(SSIZE %zu) + '%s' (SIZE %zu)\n", str->s, strlen(str->s), str2, len);
+//	strncat(str->s, str2, len);
+//	str->l += len;
+//}
 
 char *ltrim(char *s)
 {
@@ -40,12 +40,12 @@ char *trim(char *s)
 	return rtrim(ltrim(s));
 }
 
-void stlentext(stlen *str, char *str2)
-{
-	size_t len = strlen(str2) +1;
-	strlcpy(str->s, str2, len);
-	str->l += len;
-}
+//void stlentext(stlen *str, char *str2)
+//{
+//	size_t len = strlen(str2) +1;
+//	strlcpy(str->s, str2, len);
+//	str->l += len;
+//}
 
 char *gettextfile(char *path, size_t *filesz)
 {
@@ -98,18 +98,18 @@ double double_get_next(char *buf, char *sep, uint64_t *cursor)
 	return ret;
 }
 
-int64_t str_get_next(char *buf, char *ret, uint64_t ret_sz, char *sep, uint64_t *cursor)
-{
-	uint64_t end = strcspn(buf + *cursor, sep);
-	//printf("end is %"u64": '%s' (buf+%"u64"), find:('%s')\n", end, buf + *cursor, *cursor, sep);
-	uint64_t copysize = (end + 1) > ret_sz ? ret_sz : (end + 1);
-	//printf("copysize %"u64": (%d)\n", copysize, ((end + 1) > ret_sz));
-
-	strlcpy(ret, buf + *cursor, copysize);
-	(*cursor) += end;
-
-	return end;
-}
+//int64_t str_get_next(char *buf, char *ret, uint64_t ret_sz, char *sep, uint64_t *cursor)
+//{
+//	uint64_t end = strcspn(buf + *cursor, sep);
+//	//printf("end is %"u64": '%s' (buf+%"u64"), find:('%s')\n", end, buf + *cursor, *cursor, sep);
+//	uint64_t copysize = (end + 1) > ret_sz ? ret_sz : (end + 1);
+//	//printf("copysize %"u64": (%d)\n", copysize, ((end + 1) > ret_sz));
+//
+//	strlcpy(ret, buf + *cursor, copysize);
+//	(*cursor) += end;
+//
+//	return end;
+//}
 
 int64_t uint_get_next(char *buf, size_t sz, char sep, uint64_t *cursor)
 {
@@ -222,6 +222,7 @@ string* string_init_add(char *str, size_t len, size_t max)
 	ret->m = max;
 	ret->s = str;
 	ret->l = len;
+	ret->s[len] = 0;
 
 	return ret;
 }
@@ -276,6 +277,9 @@ void string_string_cat(string *str, string *src)
 void string_string_copy(string *dst, string *src)
 {
 	size_t src_len = src->l;
+
+    //if (!src_len)
+    //    return;
 
 	if (src_len > dst->m)
 		string_new_size(dst, src_len);
@@ -384,6 +388,42 @@ void string_cut(string *str, uint64_t offset, size_t len)
 	puts("================================");
 }
 
+void string_vprintf(string *str, const char *fmt, va_list ap)
+{
+    if (!str || !fmt)
+        return;
+
+    va_list ap_copy;
+    va_copy(ap_copy, ap);
+    int needed = vsnprintf(NULL, 0, fmt, ap_copy);
+    va_end(ap_copy);
+
+    if (needed <= 0)
+        return;
+
+    if (str->l + (size_t)needed + 1 >= str->m) {
+
+        size_t new_size = str->m ? str->m : 64;
+        while (str->l + (size_t)needed + 1 >= new_size)
+            new_size *= 2;
+
+        string_new_size(str, new_size);
+    }
+
+    vsnprintf(str->s + str->l, str->m - str->l, fmt, ap);
+
+    str->l += (size_t)needed;
+    str->s[str->l] = '\0';
+}
+
+void string_sprintf(string *str, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    string_vprintf(str, fmt, ap);
+    va_end(ap);
+}
+
 void string_break(string *str, uint64_t start, uint64_t end)
 {
 	uint64_t newend = end - start;
@@ -442,13 +482,20 @@ uint8_t string_tokens_push(string_tokens *st, char *s, uint64_t l)
 	if (st->m <= st->l)
 		string_tokens_scale(st);
 
-	//printf("PUSH TO %"PRIu64"\n", st->l);
 	st->str[st->l] = string_init_add(s, l, l);
-	//printf("NEW TOKEN: '%s'/%p->%p\n", st->str[st->l]->s, st->str[st->l], st->str[st->l]->s);
 
 	++st->l;
 
 	return 1;
+}
+
+
+void string_tokens_print(string_tokens *st)
+{
+    for (uint64_t i = 0; i < st->l; i++)
+    {
+        printf("token[%"PRIu64"]: '%s'\n", i, st->str[i]->s);
+    }
 }
 
 void string_tokens_free(string_tokens *st)
