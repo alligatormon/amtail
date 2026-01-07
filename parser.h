@@ -1,5 +1,5 @@
 #pragma once
-#include "sstring.h"
+//#include "sstring.h"
 #include "log.h"
 #define ALLIGATOR_VARTYPE_COUNTER 0
 #define ALLIGATOR_VARTYPE_GAUGE 1
