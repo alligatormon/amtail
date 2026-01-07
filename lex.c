@@ -12,7 +12,7 @@
 #include "file.h"
 #define OPLEN 255
 
-char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *delimit, char *openblock, char *closeblock, uint8_t *is_expression, int8_t *bracket, amtail_log_level amtail_ll)
+char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *delimit, char *openblock, char *closeblock, uint8_t *is_expression, int8_t *bracket, int8_t *squarebracket, amtail_log_level amtail_ll)
 {
 	*size = 0;
 	char *token = input;
@@ -81,7 +81,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			++token;
 			continue;
 		}
-		if (strchr(delimit, *token) != NULL) {
+		if (strchr(delimit, *token) != NULL && !iBlock) {
 			*token = '\0';
 			*size = *inout - input;
 
@@ -93,25 +93,63 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			break;
 		}
 
-		if (*token == '(' && !*bracket && !iBlock) {
+		if (*token == '(' && *bracket >= 0 && !iBlock && (!*is_expression)) {
 			*size = *inout - input;
-			++token;
-			*inout = token;
+			if (!*size) {
+				*size = 1;
+				++token;
+				*inout = token;
+			}
+			//++token;
+			//*inout = token;
 
 			*bracket = 1;
 			break;
 		}
 
-		if (*token == ')' && !iBlock && *bracket == 1) {
+		if (*token == ')' && !iBlock && *bracket >= 1 && (!*is_expression)) {
 			*size = *inout - input;
-			++token;
-			*inout = token;
+			if (!*size) {
+				*size = 1;
+				++token;
+				*inout = token;
+			}
+			//++token;
+			//*inout = token;
 
 			*bracket = 0;
 			break;
 		}
 
-		if ((*token == '=') && !iBlock) {
+		if (*token == '[' && *squarebracket >= 0 && !iBlock && (!*is_expression)) {
+			*size = *inout - input;
+			if (!*size) {
+				*size = 1;
+				++token;
+				*inout = token;
+			}
+			//++token;
+			//*inout = token;
+
+			*squarebracket = 1;
+			break;
+		}
+
+		if (*token == ']' && !iBlock && *squarebracket >= 0 && (!*is_expression)) {
+			*size = *inout - input;
+			if (!*size) {
+				*size = 1;
+				++token;
+				*inout = token;
+			}
+			//++token;
+			//*inout = token;
+
+			*squarebracket = 0;
+			break;
+		}
+
+		if ((*token == '=') && (token[1] != '~') && !iBlock) {
 			*is_expression = 1;
 		}
 
@@ -147,16 +185,18 @@ void strmbtok_amtail_lexer(char *inp, string_tokens *st, char *openblock, char *
 
 	uint8_t glob_expression = 0;
 	int8_t glob_bracket = -1;
-	while ((ltoken = strmbtok (start, inp, &inp, &sz, "\n", openblock, closeblock, &glob_expression, &glob_bracket, amtail_ll)) != NULL)
+	int8_t glob_squarebracket = -1;
+	while ((ltoken = strmbtok (start, inp, &inp, &sz, "\n", openblock, closeblock, &glob_expression, &glob_bracket, &glob_squarebracket, amtail_ll)) != NULL)
 	{
 		char *word = ltoken;
 		uint8_t is_expression = 0;
 		int8_t is_bracket = 0;
+		int8_t is_squarebracket = 0;
 
 		if (amtail_ll.lexer > 0)
 			printf("\tTOK: '%s'\n", ltoken);
 
-		while ((token = strmbtok(start, word, &word, &sz, " \t\n,", openblock, closeblock, &is_expression, &is_bracket, amtail_ll)))
+		while ((token = strmbtok(start, word, &word, &sz, " \t\n,", openblock, closeblock, &is_expression, &is_bracket, &is_squarebracket, amtail_ll)))
 		{
 			// skip comment
 			if (!strncmp(token, "#", 1))

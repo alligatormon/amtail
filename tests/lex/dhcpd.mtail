@@ -86,27 +86,35 @@ syslog
 
 
 len
+(
 $legacy_date
+)
 >
 0
 {
 
 strptime
+(
 $2
 "Jan _2 15:04:05"
+)
 
 }
 
 
 len
+(
 $rfc3339_date
+)
 >
 0
 {
 
 strptime
+(
 $rfc3339_date
 "2006-01-02T03:04:05-0700"
+)
 
 }
 
@@ -151,7 +159,16 @@ $message
 
 
 
-request_total[tolower($1)]++
+
+request_total
+[
+tolower
+(
+$1
+)
+]
+++
+
 
 
 $message
@@ -159,47 +176,71 @@ $message
 /^DHCPDISCOVER from /
 +
 MATCH_MAC
+{
 
 
-dhcpdiscovers[$mac]++
+
+dhcpdiscovers
+[
+$mac
+]
+++
+
 
 /network /
 +
 MATCH_NETWORK
 +
-/: no free leases/ {
+/: no free leases/
+{
 
-dhcpdiscover_nofree[$network]++
+
+dhcpdiscover_nofree
+[
+$network
+]
+++
+
 }
-}
 
 }
 
 
-/Configuration file errors en
-countered -- exiting/ {
+}
+
+
+
+/Configuration file errors encountered -- exiting/
+{
+
 
 
 config_file_errors++
+
 }
 
 
-/peer 
-[^:]+
-: disconnected/ {
+
+/peer ([^:]+): disconnected/
+{
+
 peer_disconnects++
+
 }
+
 
 
 /bind update on /
 +
 IP
 +
-/ got ack from 
-?P<group>\w+
-: xid mismatch./ {
+/ got ack from (?P<group>\w+): xid mismatch./
+{
+
 bind_xid_mismatch++
+
 }
+
 
 
 /uid lease /
@@ -212,18 +253,24 @@ MATCH_MAC
 +
 / is duplicate on /
 +
-MATCH_NETWORK {
+MATCH_NETWORK
+{
+
 duplicate_lease++
+
 }
 
 
-/
-?P<count>\d+
- bad udp checksums in \d+ packets/ {
+
+/(?P<count>\d+) bad udp checksums in \d+ packets/
+{
+
 bad_udp_checksum
-+
-= $count
++=
+$count
+
 }
+
 
 
 /DHCPDISCOVER from /
@@ -234,22 +281,24 @@ MATCH_MAC
 +
 IP
 +
-/: unknown network segment/ {
+/: unknown network segment/
+{
+
 unknown_subnet++
+
 }
+
 
 
 /DHCPREQUEST for /
 +
 IP
 +
-/\
-/
+/\(/
 +
 IP
 +
-/\
- from /
+/\) from /
 +
 MATCH_MAC
 +
@@ -259,60 +308,103 @@ IP
 +
 /: unknown lease /
 +
-MATCH_IP {
-unknown_lease[$ip]++
+MATCH_IP
+{
+
+unknown_lease
+[
+$ip
+]
+++
+
 }
 
 
-/bind update on \S+ from \S+ rejected: incoming update is less critical than the outgoing update/ {
+
+/bind update on \S+ from \S+ rejected: incoming update is less critical than the outgoing update/
+{
+
 update_rejected++
+
 }
 
-/timeout waiting for failover peer \S+/ {
+
+/timeout waiting for failover peer \S+/
+{
+
 failover_peer_timeout++
+
 }
+
 
 /ICMP Echo reply while lease /
 +
 IP
 +
-/valid/ {
+/valid/
+{
+
 ip_already_in_use++
+
 }
+
 
 /unexpected ICMP Echo reply from /
 +
-IP {
+IP
+{
+
 ip_already_in_use++
+
 }
+
 
 /Abandoning IP address /
 +
 IP
 +
-/: 
-?P<reason>.*
-/ {
-ip_abandoned[$reason]++
+/: (?P<reason>.*)/
+{
+
+ip_abandoned
+[
+$reason
+]
+++
+
 }
+
 
 /bind update on \S+ from \S+ rejected: /
 +
 IP
 +
-/: invalid state transition/ {
+/: invalid state transition/
+{
+
 invalid_state_transition++
+
 }
 
-/peer 
-?P<pool>[^:]+
-: Got POOLREQ
-answering negatively!/ {
-negative_poolreq[$pool]++
+
+/peer (?P<pool>[^:]+): Got POOLREQ, answering negatively!/
+{
+
+negative_poolreq
+[
+$pool
+]
+++
+
 }
 
-/Lease conflict at/ {
+
+/Lease conflict at/
+{
+
 lease_conflicts++
+
 }
+
 }
 

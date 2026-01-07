@@ -52,18 +52,39 @@ request_status
 {
 
 strptime
+(
 $timestamp
 "02/Jan/2006:15:04:05 -0700"
+)
 
 
-apache_http_requests_total[$request_method][$http_version][$request_status]++
+apache_http_requests_total
+[
+$request_method
+]
+[
+$http_version
+]
+[
+$request_status
+]
+++
 
 $response_size
 >
 0
 {
 
-apache_http_bytes_total[$request_method][$http_version][$request_status]
+apache_http_bytes_total
+[
+$request_method
+]
+[
+$http_version
+]
+[
+$request_status
+]
 +=
 $response_size
 

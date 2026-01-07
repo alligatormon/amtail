@@ -105,7 +105,22 @@ buckets
 
 
 
-http_request_duration_seconds[$server_port][$handler][$method][$code][$protocol]
+http_request_duration_seconds
+[
+$server_port
+]
+[
+$handler
+]
+[
+$method
+]
+[
+$code
+]
+[
+$protocol
+]
 =
 $time_us
 /
@@ -114,11 +129,41 @@ $time_us
 
 
 
-http_response_size_bytes_total[$server_port][$handler][$method][$code][$protocol]
+http_response_size_bytes_total
+[
+$server_port
+]
+[
+$handler
+]
+[
+$method
+]
+[
+$code
+]
+[
+$protocol
+]
 +=
 $sent_bytes
 
-http_request_size_bytes_total[$server_port][$handler][$method][$code][$protocol]
+http_request_size_bytes_total
+[
+$server_port
+]
+[
+$handler
+]
+[
+$method
+]
+[
+$code
+]
+[
+$protocol
+]
 +=
 $received_bytes
 
@@ -130,7 +175,26 @@ $received_bytes
 / conn=X /
 {
 
-http_connections_aborted_total[$server_port][$handler][$method][$code][$protocol][$connection_status]++
+http_connections_aborted_total
+[
+$server_port
+]
+[
+$handler
+]
+[
+$method
+]
+[
+$code
+]
+[
+$protocol
+]
+[
+$connection_status
+]
+++
 
 }
 
@@ -138,7 +202,26 @@ http_connections_aborted_total[$server_port][$handler][$method][$code][$protocol
 / conn=- /
 {
 
-http_connections_closed_total[$server_port][$handler][$method][$code][$protocol][$connection_status]++
+http_connections_closed_total
+[
+$server_port
+]
+[
+$handler
+]
+[
+$method
+]
+[
+$code
+]
+[
+$protocol
+]
+[
+$connection_status
+]
+++
 
 }
 
