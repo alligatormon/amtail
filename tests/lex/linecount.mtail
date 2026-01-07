@@ -1,0 +1,15 @@
+
+
+
+
+counter
+lines_total
+
+
+/$/
+{
+
+lines_total++
+
+}
+
