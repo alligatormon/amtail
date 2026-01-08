@@ -99,11 +99,9 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 				*size = 1;
 				++token;
 				*inout = token;
+				++(*bracket);
 			}
-			//++token;
-			//*inout = token;
 
-			*bracket = 1;
 			break;
 		}
 
@@ -113,11 +111,9 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 				*size = 1;
 				++token;
 				*inout = token;
+				--(*bracket);
 			}
-			//++token;
-			//*inout = token;
 
-			*bracket = 0;
 			break;
 		}
 
@@ -127,25 +123,21 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 				*size = 1;
 				++token;
 				*inout = token;
+				++(*squarebracket);
 			}
-			//++token;
-			//*inout = token;
 
-			*squarebracket = 1;
 			break;
 		}
 
-		if (*token == ']' && !iBlock && *squarebracket >= 0) {
+		if (*token == ']' && !iBlock && *squarebracket >= 1) {
 			*size = *inout - input;
 			if (!*size) {
 				*size = 1;
 				++token;
 				*inout = token;
+				--(*squarebracket);
 			}
-			//++token;
-			//*inout = token;
 
-			*squarebracket = 0;
 			break;
 		}
 
