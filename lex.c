@@ -93,7 +93,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			break;
 		}
 
-		if (*token == '(' && *bracket >= 0 && !iBlock && (!*is_expression)) {
+		if (*token == '(' && *bracket >= 0 && !iBlock) {
 			*size = *inout - input;
 			if (!*size) {
 				*size = 1;
@@ -107,7 +107,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			break;
 		}
 
-		if (*token == ')' && !iBlock && *bracket >= 1 && (!*is_expression)) {
+		if (*token == ')' && !iBlock && *bracket >= 1) {
 			*size = *inout - input;
 			if (!*size) {
 				*size = 1;
@@ -121,7 +121,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			break;
 		}
 
-		if (*token == '[' && *squarebracket >= 0 && !iBlock && (!*is_expression)) {
+		if (*token == '[' && *squarebracket >= 0 && !iBlock) {
 			*size = *inout - input;
 			if (!*size) {
 				*size = 1;
@@ -135,7 +135,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			break;
 		}
 
-		if (*token == ']' && !iBlock && *squarebracket >= 0 && (!*is_expression)) {
+		if (*token == ']' && !iBlock && *squarebracket >= 0) {
 			*size = *inout - input;
 			if (!*size) {
 				*size = 1;
