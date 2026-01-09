@@ -13,3 +13,4 @@ void string_free(string *str);
 void string_tokens_free(string_tokens *st);
 void string_string_copy(string *dst, string *src);
 
+uint64_t int_min(uint64_t a, uint64_t b);

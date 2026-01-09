@@ -11,6 +11,28 @@
 #include "log.h"
 #include "file.h"
 #define OPLEN 255
+#define DEBUGBUFFERSIZE 255
+
+char* lexdebugprint(char *debugbuffer, size_t debugsize, char *token, size_t size) {
+	uint64_t i;
+	uint64_t j;
+	for (i = 0, j = 0; i < size; ++i, ++j) {
+		if (token[j] == '\n') {
+			if (int_min(debugsize, size) == size) {
+				int ret = strlcpy(debugbuffer+i, " %NEXTLINE%:", size);
+				i += ret - 1;
+				size += ret - 1;
+				size = int_min(debugsize, size);
+				debugsize -= ret - 1;
+			}
+		} else if (isprint(token[j])) {
+			debugbuffer[i] = token[j];
+			--debugsize;
+		}
+	}
+	debugbuffer[i] = 0;
+	return debugbuffer;
+}
 
 char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *delimit, char *openblock, char *closeblock, uint8_t *is_expression, int8_t *bracket, int8_t *squarebracket, amtail_log_level amtail_ll)
 {
@@ -20,8 +42,10 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 	char *block = NULL;
 	int iBlock = 0;
 	int iBlockIndex = 0;
+	int regexBlock = 0;
 	char quota;
 	uint8_t quotas = 0;
+	char debugbuffer[DEBUGBUFFERSIZE];
 
 	if (!input)
 		*inout = input;
@@ -40,47 +64,101 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 	{
 		*inout = token;
 
+		if (amtail_ll.lexer > 1)
+			printf("> token: '%s', isexpression? %hhu\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 20), *is_expression);
+
 		if (!*token)
 		{
 			*size = *inout - input;
 
-			if (amtail_ll.lexer > 1 && ((token - 3) >= start))
-				printf("\texit 0: '%s'\n", strndup(token-3, 3));
+			if (amtail_ll.lexer > 1 && (token >= (start + 3)))
+				printf("\t> no token, end: '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 20));
 
 			break;
 		}
 
-		if (!iBlock && *token == '#') // need exit?
+		if (!iBlock && !regexBlock && *token == '#') {
 			token += strcspn(token, "\n");
+
+			if (amtail_ll.lexer > 1)
+				printf("> shifted: '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 20));
+		}
 
 		if (iBlock)
 		{
-			if ((closeblock[iBlockIndex] == *token) && (token > start) && (token[-1] != '\\') && (!quotas) && (!*is_expression))
+			//if ((closeblock[iBlockIndex] == *token) && (token > start) && (token[-1] != '\\') && (!quotas) && (!*is_expression))
+			if ((closeblock[iBlockIndex] == *token) && (token > start) && (token[-1] != '\\') && (!quotas)) {
+				if (amtail_ll.lexer > 1)
+					printf("\t<<end quotas block '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 20));
+
 				iBlock = 0;
+			}
+			else
+				if (amtail_ll.lexer > 1)
+					printf("\t<<iBlock quotas continues '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 20));
 
 			++token;
 			continue;
 		}
-		if (((block = strchr(openblock, *token)) != NULL) && first &&  (!*is_expression))
+
+		if (regexBlock)
 		{
-			if (amtail_ll.lexer > 1 && ((token - 1) >= start))
-				printf("\ttoken '%c', token pre: '%c'\n", *token, token[-1]);
+			if ((*token == '/') && (token > start) && (token[-1] != '\\') && (!quotas)) {
+				if (amtail_ll.lexer > 1)
+					printf("\t<<end regexp block '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 20));
+
+				regexBlock = 0;
+			}
+			else
+				if (amtail_ll.lexer > 1)
+					printf("\t<<regexBlock regexp continues '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 20));
+
+			++token;
+			continue;
+		}
+
+		//if (((block = strchr(openblock, *token)) != NULL) && first &&  (!*is_expression))
+		if (((block = strchr(openblock, *token)) != NULL) && first)
+		{
+			if (amtail_ll.lexer > 1)
+				printf("\t<<start open1 block '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 20));
 
 			iBlock = 1;
 			iBlockIndex = block - openblock;
 			++token;
 			continue;
 		}
-		if (((block = strchr(openblock, *token)) != NULL) && !first && (token[-1] != '\\') && (!quotas) && (!*is_expression))
+		//if (((block = strchr(openblock, *token)) != NULL) && !first && (token[-1] != '\\') && (!quotas) && (!*is_expression))
+		if (((block = strchr(openblock, *token)) != NULL) && !first && (token[-1] != '\\') && (!quotas))
 		{
-			if (amtail_ll.lexer > 1 && ((token - 1) >= start))
-				printf("\ttoken '%c', token pre: '%c'\n", *token, token[-1]);
+			if (amtail_ll.lexer > 1)
+				printf("\t<<start open2 block '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 20));
 
 			iBlock = 1;
 			iBlockIndex = block - openblock;
 			++token;
 			continue;
 		}
+
+		if ((*token == '/') && first && (!*is_expression))
+		{
+			if (amtail_ll.lexer > 1)
+				printf("\t>>find regexp block '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+
+			regexBlock = 1;
+			++token;
+			continue;
+		}
+		if ((*token == '/') && !first && (token[-1] != '\\') && (!quotas) && (!*is_expression))
+		{
+			if (amtail_ll.lexer > 1)
+				printf("\t>>find regexp block '%s', is expression: %d\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10), *is_expression);
+
+			regexBlock = 1;
+			++token;
+			continue;
+		}
+
 		if (strchr(delimit, *token) != NULL && !iBlock) {
 			*token = '\0';
 			*size = *inout - input;
@@ -89,12 +167,16 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			*inout = token;
 
 			if (amtail_ll.lexer > 1)
-				printf("\texit 1: '%s'\n", strndup(token, 15));
+				printf("\t>>delimiter exit 1: '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 15));
 			break;
 		}
 
 		if (*token == '(' && *bracket >= 0 && !iBlock) {
 			*size = *inout - input;
+
+			if (amtail_ll.lexer > 1)
+				printf("\t>>find quota block (%lluu) '%s'\n", *size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+
 			if (!*size) {
 				*size = 1;
 				++token;
@@ -107,6 +189,10 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 
 		if (*token == ')' && !iBlock && *bracket >= 1) {
 			*size = *inout - input;
+
+			if (amtail_ll.lexer > 1)
+				printf("\t>>end bracket block (%llu) '%s'\n", *size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+
 			if (!*size) {
 				*size = 1;
 				++token;
@@ -119,6 +205,10 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 
 		if (*token == '[' && *squarebracket >= 0 && !iBlock) {
 			*size = *inout - input;
+
+			if (amtail_ll.lexer > 1)
+				printf("\t>>find square block (%llu) '%s'\n", *size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+
 			if (!*size) {
 				*size = 1;
 				++token;
@@ -131,6 +221,10 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 
 		if (*token == ']' && !iBlock && *squarebracket >= 1) {
 			*size = *inout - input;
+
+			if (amtail_ll.lexer > 1)
+				printf("\t>>end square block (%llu) '%s'\n", *size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+
 			if (!*size) {
 				*size = 1;
 				++token;
@@ -142,11 +236,17 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 		}
 
 		if ((*token == '=') && (token[1] != '~') && !iBlock) {
+			if (amtail_ll.lexer > 1)
+				printf("\t>>find expression block '%s'\n", lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+
 			*is_expression = 1;
 		}
 
 		if (*token == '"' || *token == '\'')
 		{
+			if (amtail_ll.lexer > 1)
+				printf("\t>>find quota '%c', quotas: %d, strings '%s'\n", *token, quotas, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+
 			if (quotas)
 			{
 				if (quota == *token)
@@ -162,6 +262,8 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 		}
 
 		++token;
+		if (amtail_ll.lexer > 1)
+			printf("\t>> skip, next token\n");
 		first = 0;
 	}
 	return lead;
@@ -172,22 +274,27 @@ void strmbtok_amtail_lexer(char *inp, string_tokens *st, char *openblock, char *
 {
 	char *start = inp;
 	char *ltoken;
-	char *token;
 	uint64_t sz;
 
 	uint8_t glob_expression = 0;
 	int8_t glob_bracket = -1;
 	int8_t glob_squarebracket = -1;
+
+	int amtail_lexer_log = amtail_ll.lexer;
+	amtail_ll.lexer = 0;
+
 	while ((ltoken = strmbtok (start, inp, &inp, &sz, "\n", openblock, closeblock, &glob_expression, &glob_bracket, &glob_squarebracket, amtail_ll)) != NULL)
 	{
 		char *word = ltoken;
 		uint8_t is_expression = 0;
 		int8_t is_bracket = 0;
 		int8_t is_squarebracket = 0;
+		char *token;
 
 		if (amtail_ll.lexer > 0)
 			printf("\tTOK: '%s'\n", ltoken);
 
+		amtail_ll.lexer = amtail_lexer_log;
 		while ((token = strmbtok(start, word, &word, &sz, " \t\n,", openblock, closeblock, &is_expression, &is_bracket, &is_squarebracket, amtail_ll)))
 		{
 			// skip comment
@@ -201,8 +308,8 @@ void strmbtok_amtail_lexer(char *inp, string_tokens *st, char *openblock, char *
 				continue;
 			}
 
-			if (*token == '=' && sz == 1)
-				is_expression = 1;
+			//if (*token == '=' && sz == 1)
+			//	is_expression = 1;
 
 			if (amtail_ll.lexer > 0)
 				printf("FILE %s TOKEN SIZE: '%s' (%llu) expr: %d, index %llu\n", name, token, sz, is_expression, st->l+1);
@@ -212,6 +319,9 @@ void strmbtok_amtail_lexer(char *inp, string_tokens *st, char *openblock, char *
 
 		string_tokens_push(st, strdup("\n"), 1);
 		is_expression = 0;
+		glob_expression = 0;
+
+		amtail_ll.lexer = 0;
 	}
 }
 
@@ -224,7 +334,8 @@ string_tokens* amtail_lex(string *arg, char *name, amtail_log_level amtail_ll)
 
 	string_tokens *st = string_tokens_new();
 
-	strmbtok_amtail_lexer(a->mem, st, "/'\"", "/'\"", name, amtail_ll);
+	//strmbtok_amtail_lexer(a->mem, st, "/'\"", "/'\"", name, amtail_ll);
+	strmbtok_amtail_lexer(a->mem, st, "'\"", "'\"", name, amtail_ll);
 
 	releasefile(a);
 
@@ -276,7 +387,7 @@ void compare_mem_lines_with_tokens(char *mem, size_t mem_len, string_tokens *st)
 	}
 
 	if (line_no < st->l) {
-		puts("too many tokens");
+		printf("too many tokens: lines in file %zu, tokens: %llu\n", line_no, st->l);
 	}
 }
 int amtail_lex_test(string *arg, char *name, amtail_log_level amtail_ll, string_tokens *st)
