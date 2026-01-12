@@ -11,7 +11,7 @@ void run_tests(char *dir, char *file, string *logline)
 {
 	string *str = string_init_dup(dir);
 	amtail_log_level amtail_ll = {
-		.parser = 1,
+		.parser = 0,
 		.lexer = 0,
 		.compiler = 0,
 	};
@@ -30,6 +30,12 @@ void run_tests_file(char *dir, char *file, char *log_filename)
 		.compiler = 0,
 	};
 	amtail_bytecode* byte_code = amtail_compile(file, str, amtail_ll);
+    if (!byte_code)
+    {
+        printf("byte_code haven't ready, exit program\n");
+        return;
+        //exit(1);
+    }
 
 	struct file *file_log = readfile(log_filename);
 	string *logline = string_init_add(file_log->mem, file_log->size, file_log->size);
@@ -52,21 +58,22 @@ int main()
 	amtail_vm_init();
 	run_tests_file("tests/nginx.mtail", "nginx.mtail", "log/test2.log");
 	//string *logline = string_init_alloc("test 1", 6);
-	//run_tests("tests/apache_combined.mtail", "apache_combined.mtail", logline);
-	//run_tests("tests/apache_common.mtail", "apache_common.mtail");
-	//run_tests("tests/apache_metrics.mtail", "apache_metrics.mtail");
-	//run_tests("tests/dhcpd.mtail", "dhcpd.mtail");
-	//run_tests("tests/histogram.mtail", "histogram.mtail");
-	//run_tests("tests/lighttpd.mtail", "lighttpd.mtail");
-	//run_tests("tests/linecount.mtail", "linecount.mtail");
-	//run_tests("tests/mysql_slowqueries.mtail", "mysql_slowqueries.mtail");
-	//run_tests("tests/nocode.mtail", "nocode.mtail");
-	//run_tests("tests/ntpd.mtail", "ntpd.mtail");
-	//run_tests("tests/ntpd_peerstats.mtail", "ntpd_peerstats.mtail");
-	//run_tests("tests/postfix.mtail", "postfix.mtail");
-	//run_tests("tests/rails.mtail", "rails.mtail");
-	//run_tests("tests/rsyncd.mtail", "rsyncd.mtail");
-	//run_tests("tests/sftp.mtail", "sftp.mtail");
-	//run_tests("tests/timer.mtail", "timer.mtail");
-	//run_tests("tests/vsftpd.mtail", "vsftpd.mtail");
+	run_tests_file("tests/apache_combined.mtail", "apache_combined.mtail", "log/test2.log");
+	run_tests_file("tests/apache_common.mtail", "apache_common.mtail", "log/test2.log");
+	run_tests_file("tests/apache_metrics.mtail", "apache_metrics.mtail", "log/test2.log");
+
+	run_tests_file("tests/dhcpd.mtail", "dhcpd.mtail", "log/test2.log");
+	run_tests_file("tests/histogram.mtail", "histogram.mtail", "log/test2.log");
+	run_tests_file("tests/lighttpd.mtail", "lighttpd.mtail", "log/test2.log");
+	run_tests_file("tests/linecount.mtail", "linecount.mtail", "log/test2.log");
+	run_tests_file("tests/mysql_slowqueries.mtail", "mysql_slowqueries.mtail", "log/test2.log");
+	run_tests_file("tests/nocode.mtail", "nocode.mtail", "log/test2.log");
+	run_tests_file("tests/ntpd.mtail", "ntpd.mtail", "log/test2.log");
+	run_tests_file("tests/ntpd_peerstats.mtail", "ntpd_peerstats.mtail", "log/test2.log");
+	run_tests_file("tests/postfix.mtail", "postfix.mtail", "log/test2.log");
+	run_tests_file("tests/rails.mtail", "rails.mtail", "log/test2.log");
+	run_tests_file("tests/rsyncd.mtail", "rsyncd.mtail", "log/test2.log");
+	run_tests_file("tests/sftp.mtail", "sftp.mtail", "log/test2.log");
+	run_tests_file("tests/timer.mtail", "timer.mtail", "log/test2.log");
+	run_tests_file("tests/vsftpd.mtail", "vsftpd.mtail", "log/test2.log");
 }

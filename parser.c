@@ -1,6 +1,6 @@
 #include "common/selector.h"
 #include <string.h>
-#include "sstring.h"
+//#include "sstring.h"
 #include "parser.h"
 #define AMTAIL_INDENT_MAX_SIZE 4096
 
@@ -363,10 +363,10 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 
 	for (uint64_t i = 0; i < tokens->l; i++)
 	{
-		//for (uint64_t ii = 0; ii < identy; ii++, printf("\t"));
-		//printf("i=%"PRIi64", identy %"PRIu64"\n", i, identy);
-		//for (uint64_t ii = 0; ii < identy; ii++, printf("\t"));
-		//printf("%lu: '%s'\n", i, tokens->str[i]->s);
+		for (uint64_t ii = 0; ii < identy; ii++, printf("\t"));
+		printf("i=%"PRIi64", identy %"PRIu64"\n", i, identy);
+		for (uint64_t ii = 0; ii < identy; ii++, printf("\t"));
+		printf("%llu: '%s'\n", i, tokens->str[i]->s);
 		if (!strcmp(tokens->str[i]->s, "counter"))
 		{
 			++i;
@@ -498,13 +498,20 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			string_null(expr);
 			//++i;
 		}
-		else if (tokens->str[i]->s[0] != '/' && strstr(tokens->str[i]->s, "++"))
+		else if (tokens->str[i]->s[0] != '/' && strstr(tokens->str[i]->s, "++") && tokens->str[i]->l > 2)
 		{
 			cur->opcode = AMTAIL_AST_OPCODE_INC;
 			cur->name = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l - 3);
 
 			if (amtail_ll.parser > 0)
 				printf("increment [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
+		}
+		else if (strstr(tokens->str[i]->s, "++") && tokens->str[i]->l == 2)
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_INC;
+
+			if (amtail_ll.parser > 0)
+				printf("increment without name [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
 		}
 		else if (tokens->str[i]->s[0] != '/' && strstr(tokens->str[i]->s, "--"))
 		{
@@ -515,14 +522,21 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 		}
 		else if (!strcmp(tokens->str[i]->s, "\n")) // NEWLINE
 		{
-			if (cur->name)
+			if (cur && cur->name)
 			{
 				cur->stem = amtail_ast_multi_init(1);
-				cur = cur->stem[AMTAIL_AST_LEFT];
+				if (cur->stem && cur->stem[AMTAIL_AST_LEFT])
+					cur = cur->stem[AMTAIL_AST_LEFT];
+				else
+				{
+					if (amtail_ll.parser > 0)
+						printf("warning: failed to create new AST node for NEWLINE at token %"PRIu64"\n", i);
+					cur = NULL;
+				}
 			}
 
 			if (amtail_ll.parser > 1)
-				printf("NEWLINE [%"PRIu64"]: '%s'\n", i, (cur->name ? cur->name->s : "NULL"));
+				printf("NEWLINE [%"PRIu64"]: '%s'\n", i, (cur && cur->name ? cur->name->s : "NULL"));
 
 			hidden = 0;
 			vartype = 0;
@@ -724,7 +738,10 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 				printf("tok [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
 
 		if (!strcmp(tokens->str[i]->s, "\n"))
+        {
 			begin = 1;
+			calculation_flush(&calculation_expr, stack, &cur);
+	    }
 		else
 			begin = 0;
 

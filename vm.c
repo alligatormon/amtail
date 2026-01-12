@@ -207,7 +207,7 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *new = calloc(1, sizeof(*new));
-	printf("RUN: left %p, right %p, new %p, find variable %s\n", left, right, new, right->export_name->s);
+	printf("RUN: left %p, right %p, new %p, find variable %s\n", left, right, new, right->export_name ? right->export_name->s : NULL);
 	amtail_vmstack_push(amt_thread, new);
 	new->allocated = 1;
 
@@ -228,7 +228,10 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		string_cat(new_export_name, template_name, template_size);
 
 		uint8_t *by_positions = NULL;
-		if (template_var->by && template_var->by_count) {
+		string **by = NULL;
+		uint8_t by_count = 0;
+
+		if (template_var && template_var->by && template_var->by_count) {
 			char *ptrby = key + template_size;
 			by_positions = malloc(sizeof(*by_positions) * (template_var->by_count + 1));
 			uint8_t i = 0;
@@ -246,9 +249,12 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 				by_positions[i] = right->export_name->l;
 			else
 				by_positions[i] = ptrby - key + 2;
+
+			by = template_var->by;
+			by_count = template_var->by_count;
 		}
 
-		var = amtail_variable_make(hidden, vartype, key, new_export_name, template_var->by, template_var->by_count, by_positions);
+		var = amtail_variable_make(hidden, vartype, key, new_export_name, by, by_count, by_positions);
 		alligator_ht_insert(variables, &(var->node), var, name_hash);
 	}
 

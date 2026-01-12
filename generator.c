@@ -57,24 +57,33 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
 		fill->export_name = string_new();
 		string_string_copy(fill->export_name, ast->export_name);
         if (amtail_ll.generator > 0)
-		    printf("> byteop %p name %s\n", fill, fill->export_name->s);
+		    printf("> byteop %p exort_name %s\n", fill, fill->export_name->s);
 	}
 
-	if (ast->name && !ast->export_name)
+	if (ast->name && ast->name->l && !ast->export_name)
 	{
+        printf("fill %p name %s\n", ast, ast->name->s);
 		fill->export_name = string_new();
 		string_string_copy(fill->export_name, ast->name);
-        if (amtail_ll.generator > 0)
-		    printf("> byteop %p name %s\n", fill, fill->export_name->s);
+		if (amtail_ll.generator > 0)
+			printf("> byteop %p name %s\n", fill, fill->export_name->s);
 	}
 
     if (fill->opcode == AMTAIL_AST_OPCODE_BRANCH)
     {
-        --fill->export_name->l;
-        fill->export_name->s[fill->export_name->l] = 0;
-        fill->re_match = amtail_regex_compile(fill->export_name->s + 1);
-        if (amtail_ll.generator > 0)
-            printf("try to compile regexp: %p: '%s'\n", fill->re_match, fill->export_name->s + 1);
+        if (fill->export_name && fill->export_name->l > 0)
+        {
+            --fill->export_name->l;
+            fill->export_name->s[fill->export_name->l] = 0;
+            fill->re_match = amtail_regex_compile(fill->export_name->s + 1);
+            if (amtail_ll.generator > 0)
+                printf("try to compile regexp: %p: '%s'\n", fill->re_match, fill->export_name->s + 1);
+        }
+        else
+        {
+            if (amtail_ll.generator > 0)
+                printf("warning: BRANCH opcode without export_name, skipping regex compilation\n");
+        }
     }
 
     if (fill->opcode == AMTAIL_AST_OPCODE_VAR)
@@ -82,13 +91,13 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
         if (ast->vartype == ALLIGATOR_VARTYPE_COUNTER)
         {
             fill->li = ast->ivalue;
-            if (amtail_ll.generator > 0)
+            if (amtail_ll.generator > 0 && fill->export_name)
                 printf("assign integer: %p: '%s' -> %"PRId64"\n", fill, fill->export_name->s, fill->li);
         }
         else if (ast->vartype == ALLIGATOR_VARTYPE_GAUGE)
         {
             fill->ld = ast->dvalue;
-            if (amtail_ll.generator > 0)
+            if (amtail_ll.generator > 0 && fill->export_name)
                 printf("assign double: %p: '%s' -> %lf\n", fill, fill->export_name->s, fill->ld);
         }
     }

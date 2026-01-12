@@ -498,6 +498,10 @@ void string_tokens_print(string_tokens *st)
     }
 }
 
+uint64_t int_min(uint64_t a, uint64_t b) {
+    return a > b ? b : a;
+}
+
 void string_tokens_free(string_tokens *st)
 {
 	//printf("st->l size %"PRIu64"\n", st->l);

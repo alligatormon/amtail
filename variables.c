@@ -7,6 +7,7 @@
 void amtail_variables_dump_foreach(void *funcarg, void* arg)
 {
 	amtail_variable *var = arg;
+    printf("variable %d: %s\n", var->is_template, var->export_name->s);
 	if (var->is_template)
 		return;
 
