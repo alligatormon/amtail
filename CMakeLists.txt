@@ -7,7 +7,7 @@ project(amtail VERSION ${VERSION})
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-include(${CMAKE_BINARY_DIR}/cmakedeps_macros.cmake)
+#include(${CMAKE_BINARY_DIR}/cmakedeps_macros.cmake)
 #conan_basic_setup()
 
 set(CMAKE_BUILD_TYPE Debug)
@@ -17,6 +17,7 @@ set(HEAD ${PROJECT_NAME})
 set(CMAKE_C_FLAGS "-isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -Werror -Wall -Wno-implicit-function-declaration -Wno-char-subscripts -Wno-error=format-extra-args -Wno-error=format -Wno-variadic-macros -Wno-error=unused-result -Wno-undef -Wunreachable-code -Wno-unreachable-code -O3 -std=gnu11 -pthread -pg")
 include_directories(/usr/local/include)
 include_directories(/opt/homebrew/Cellar/jansson/2.14.1/include/)
+include_directories(/System/Volumes/Data/opt/homebrew/Cellar/pcre/8.45/include/)
 include_directories(../alligator/src)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})

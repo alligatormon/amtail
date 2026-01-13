@@ -26,7 +26,7 @@ amtail_bytecode* amtail_compile(char *name, string *str, amtail_log_level amtail
 	amtail_ast *ast = amtail_parser(tokens, name, amtail_ll);
 	if (!ast)
 	{
-		if (amtail_ll.compiler > 0 > 0)
+		if (amtail_ll.compiler > 0)
 			printf("Syntax analyze error for script: %s\n", name);
 
 		string_tokens_free(tokens);
