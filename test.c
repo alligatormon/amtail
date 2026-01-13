@@ -26,23 +26,27 @@ void run_tests_file(char *dir, char *file, char *log_filename)
 	amtail_log_level amtail_ll = {
 		.parser = 0,
 		.lexer = 0,
-        .generator = 0,
+		.generator = 0,
 		.compiler = 0,
 	};
 	amtail_bytecode* byte_code = amtail_compile(file, str, amtail_ll);
-    if (!byte_code)
-    {
-        printf("byte_code haven't ready, exit program\n");
-        return;
-        //exit(1);
-    }
+	if (!byte_code)
+	{
+		printf("byte_code doest not ready, exit program\n");
+		return;
+		//exit(1);
+	}
 
 	struct file *file_log = readfile(log_filename);
+	if (!file_log || !file_log->mem) {
+		printf("cannot read logfile: %s\n", log_filename);
+		return;
+	}
 	string *logline = string_init_add(file_log->mem, file_log->size, file_log->size);
-    //string_tokens *logline = readlogfile(log_filename);
+	//string_tokens *logline = readlogfile(log_filename);
 
-    amtail_bytecode_dump(byte_code);
-    //exit(0);
+	amtail_bytecode_dump(byte_code);
+	//exit(0);
 	amtail_run(byte_code, logline);
 
 	amtail_variables_dump(byte_code->variables);
