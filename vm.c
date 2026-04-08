@@ -4,6 +4,7 @@
 #include "variables.h"
 #include "dstructures/tommy.h"
 #include <string.h>
+#include <math.h>
 
 void (*amtail_vmfunc[256])(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline);
 
@@ -487,7 +488,7 @@ int amtail_run(amtail_bytecode* byte_code, string* logline)
 		for (uint64_t i = 0; i < size; ++i)
 		{
 			rc = amtail_execute(amt_thread, &byte_ops[i], variables, logline);
-			printf("amtail_execute [%llu] returned %d\n", i, rc);
+			printf("amtail_execute [%llu] returned %d\n", (unsigned long long)i, rc);
 			if (rc == 2) // branch
 			{
 				uint64_t new = amtail_branch_select(&byte_ops[i], variables, logline, cursym_log, line_size);

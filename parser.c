@@ -25,6 +25,20 @@ amtail_ast** amtail_ast_multi_init(uint64_t count)
 
 void amtail_ast_free(amtail_ast *ast)
 {
+	if (!ast)
+		return;
+
+	if (ast->stem)
+	{
+		amtail_ast *left = ast->stem[AMTAIL_AST_LEFT];
+		amtail_ast *right = ast->stem[AMTAIL_AST_RIGHT];
+		if (left && left != ast)
+			amtail_ast_free(left);
+		if (right && right != ast)
+			amtail_ast_free(right);
+		free(ast->stem);
+	}
+
 	if (ast->name)
 		string_free(ast->name);
 
@@ -35,10 +49,25 @@ void amtail_ast_free(amtail_ast *ast)
 	{
 		for (uint64_t i = 0; i < ast->by_count; ++i)
 		{
-			string_free(ast->by[i]);
+			if (ast->by[i])
+				string_free(ast->by[i]);
 		}
+	}
+	if (*ast->bucket)
+	{
+		for (uint64_t i = 0; i < ast->bucket_count; ++i)
+		{
+			if (ast->bucket[i])
+				string_free(ast->bucket[i]);
+		}
+	}
 
-		//free(ast->by);
+	if (ast->opcode == AMTAIL_AST_OPCODE_VARIABLE &&
+	    (ast->vartype == ALLIGATOR_VARTYPE_TEXT || ast->vartype == ALLIGATOR_VARTYPE_CONST) &&
+	    ast->facttype == ALLIGATOR_FACTTYPE_TEXT &&
+	    ast->svalue)
+	{
+		string_free(ast->svalue);
 	}
 
 	free(ast);
@@ -211,28 +240,34 @@ calculation_cluster* calculation_new(uint64_t size) {
 
 void calculation_push_queue(calculation_cluster *calculation_expr, char *str, size_t len) {
 	if (len == 1)
-		printf("\tcalculation_push_queue is %p, ll is %llu, '%c'(1)\n", calculation_expr, calculation_expr->qcur, *str);
+		printf("\tcalculation_push_queue is %p, ll is %llu, '%c'(1)\n", calculation_expr, (unsigned long long)calculation_expr->qcur, *str);
 	else
-		printf("\tcalculation_push_queue is %p, ll is %llu, '%s'(%zu)\n", calculation_expr, calculation_expr->qcur, str, len);
+		printf("\tcalculation_push_queue is %p, ll is %llu, '%s'(%zu)\n", calculation_expr, (unsigned long long)calculation_expr->qcur, str, len);
 	calculation_expr->queue[calculation_expr->qcur].svalue = string_init_alloc(str, len);
 	calculation_expr->queue[calculation_expr->qcur].vartype = ALLIGATOR_VARTYPE_TEXT;
 	++calculation_expr->qcur;
 }
 
 void calculation_push_stack(calculation_cluster *calculation_expr, char str) {
-	printf("\tcalculation_push_stack is %p, ll is %llu, sym '%c'\n", calculation_expr, calculation_expr->scur, str);
+	printf("\tcalculation_push_stack is %p, ll is %llu, sym '%c'\n", calculation_expr, (unsigned long long)calculation_expr->scur, str);
 	calculation_expr->stack[calculation_expr->scur++] = str;
 }
 
 char calculation_pop_stack(calculation_cluster *calculation_expr) {
-	printf("\tcalculation_pop_stack is %p, ll is %llu, pop sym: '%c'\n", calculation_expr, calculation_expr->scur, calculation_expr->stack[calculation_expr->scur-1]);
 	if (calculation_expr->scur < 1)
 		return 0;
+	printf("\tcalculation_pop_stack is %p, ll is %llu, pop sym: '%c'\n",
+	       calculation_expr, (unsigned long long)calculation_expr->scur,
+	       calculation_expr->stack[calculation_expr->scur-1]);
 	return calculation_expr->stack[--calculation_expr->scur];
 }
 
 char calculation_peek_stack(calculation_cluster *calculation_expr) {
-	printf("\tcalculation_peek_stack is %p, ll is %llu, peek sym: '%c'\n", calculation_expr, calculation_expr->scur, calculation_expr->stack[calculation_expr->scur-1]);
+	if (calculation_expr->scur < 1)
+		return 0;
+	printf("\tcalculation_peek_stack is %p, ll is %llu, peek sym: '%c'\n",
+	       calculation_expr, (unsigned long long)calculation_expr->scur,
+	       calculation_expr->stack[calculation_expr->scur-1]);
 	return calculation_expr->stack[calculation_expr->scur-1];
 }
 
@@ -244,8 +279,20 @@ void calculation_del_queue(calculation_cluster *cc) {
 			string_free(cc->queue[i].svalue);
 	}
 
+	free(cc->queue);
 	free(cc->stack);
 	free(cc);
+}
+
+static void amtail_parser_const_free(void *arg)
+{
+	amtail_variable *var = arg;
+	if (!var)
+		return;
+
+	if (var->facttype == ALLIGATOR_FACTTYPE_TEXT && var->s)
+		string_free(var->s);
+	free(var);
 }
 void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack, amtail_ast **ccur) {
 	if (!*calculation_ptr)
@@ -325,6 +372,7 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 	amtail_ast_stack_push(stack, cur);
 	cur->stem = amtail_ast_multi_init(2);
 	cur = cur->stem[AMTAIL_AST_LEFT];
+	*ccur = cur;
 
 	calculation_del_queue(calculation_expr);
 
@@ -448,7 +496,11 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 
 			if (cur->opcode != AMTAIL_AST_OPCODE_NOOP || cur->name || cur->export_name)
 			{
-				cur->stem = amtail_ast_multi_init(1);
+				/*
+				 * Use 2 children everywhere to keep LEFT/RIGHT access safe.
+				 * Some control-flow paths expect RIGHT child after stack pop.
+				 */
+				cur->stem = amtail_ast_multi_init(2);
 				if (cur->stem && cur->stem[AMTAIL_AST_LEFT])
 					cur = cur->stem[AMTAIL_AST_LEFT];
 				else
@@ -606,7 +658,11 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			else if (var->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
 				cur->dvalue = var->d;
 			else if (var->facttype == ALLIGATOR_FACTTYPE_TEXT)
+			{
+				if (cur->svalue)
+					string_free(cur->svalue);
 				cur->svalue = string_string_init_dup(var->s);
+			}
 			continue;
 		}
 
@@ -624,8 +680,7 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			continue;
 		}
 		if (!strcmp(t, "otherwise"))
-		{
-			/*
+		{			/*
 			 * else-like branch marker; keep it explicit in AST so codegen/vm
 			 * can wire control-flow later.
 			 */
@@ -779,12 +834,16 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 		if (t[0] == '/' || (!pstate.expression && t[0] == '+') || pstate.branch ||
 			alligator_ht_search(const_data, amtail_variable_compare, t, amtail_hash(t, tok->l)))
 		{
+			uint8_t created_name = 0;
 			pstate.branch = 1;
 			if (!strcmp(t, "//") || !strcmp(t, "+"))
 				continue;
 
 			if (!cur->name)
+			{
 				cur->name = string_new();
+				created_name = 1;
+			}
 
 			if (t[0] == '/')
 			{
@@ -797,7 +856,14 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			{
 				amtail_variable *v = alligator_ht_search(const_data, amtail_variable_compare, t, amtail_hash(t, tok->l));
 				if (!v)
+				{
+					if (created_name)
+					{
+						string_free(cur->name);
+						cur->name = NULL;
+					}
 					continue;
+				}
 
 				if (v->facttype == ALLIGATOR_FACTTYPE_TEXT && v->s->l >= 2 && v->s->s[0] == '/' && v->s->s[v->s->l - 1] == '/')
 					string_cat(cur->name, v->s->s + 1, v->s->l - 2);
@@ -819,6 +885,13 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 
 	if (amtail_ll.parser)
 		puts("\t<-----> END PARSER <----->");
+
+	if (const_data)
+	{
+		alligator_ht_forfree(const_data, amtail_parser_const_free);
+		free(const_data);
+	}
+	amtail_ast_free(stack);
 
 	return ast;
 }

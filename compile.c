@@ -38,7 +38,7 @@ amtail_bytecode* amtail_compile(char *name, string *str, amtail_log_level amtail
 
 
 	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
-	printf("debug! byte code len %llu\n", byte_code->l);
+	printf("debug! byte code len %llu\n", (unsigned long long)byte_code->l);
 	if (!byte_code)
 	{
 		if (amtail_ll.compiler > 0)

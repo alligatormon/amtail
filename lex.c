@@ -43,7 +43,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 	int iBlock = 0;
 	int iBlockIndex = 0;
 	int regexBlock = 0;
-	char quota;
+	char quota = '\0';
 	uint8_t quotas = 0;
 	char debugbuffer[DEBUGBUFFERSIZE];
 
@@ -175,7 +175,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			*size = *inout - input;
 
 			if (amtail_ll.lexer > 1)
-				printf("\t>>find quota block (%lluu) '%s'\n", *size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+				printf("\t>>find quota block (%llu) '%s'\n", (unsigned long long)*size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
 
 			if (!*size) {
 				*size = 1;
@@ -191,7 +191,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			*size = *inout - input;
 
 			if (amtail_ll.lexer > 1)
-				printf("\t>>end bracket block (%llu) '%s'\n", *size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+				printf("\t>>end bracket block (%llu) '%s'\n", (unsigned long long)*size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
 
 			if (!*size) {
 				*size = 1;
@@ -207,7 +207,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			*size = *inout - input;
 
 			if (amtail_ll.lexer > 1)
-				printf("\t>>find square block (%llu) '%s'\n", *size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+				printf("\t>>find square block (%llu) '%s'\n", (unsigned long long)*size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
 
 			if (!*size) {
 				*size = 1;
@@ -223,7 +223,7 @@ char *strmbtok(char *start, char *input, char **inout, uint64_t *size, char *del
 			*size = *inout - input;
 
 			if (amtail_ll.lexer > 1)
-				printf("\t>>end square block (%llu) '%s'\n", *size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
+				printf("\t>>end square block (%llu) '%s'\n", (unsigned long long)*size, lexdebugprint(debugbuffer, DEBUGBUFFERSIZE, token, 10));
 
 			if (!*size) {
 				*size = 1;
@@ -304,7 +304,7 @@ void strmbtok_amtail_lexer(char *inp, string_tokens *st, char *openblock, char *
 			if (sz < 1)
 			{
 				if (amtail_ll.lexer > 0)
-					printf("NO SIZE: '%s' (%llu)\n", token, sz);
+					printf("NO SIZE: '%s' (%llu)\n", token, (unsigned long long)sz);
 				continue;
 			}
 
@@ -312,7 +312,7 @@ void strmbtok_amtail_lexer(char *inp, string_tokens *st, char *openblock, char *
 			//	is_expression = 1;
 
 			if (amtail_ll.lexer > 0)
-				printf("FILE %s TOKEN SIZE: '%s' (%llu) expr: %d, index %llu\n", name, token, sz, is_expression, st->l+1);
+				printf("FILE %s TOKEN SIZE: '%s' (%llu) expr: %d, index %llu\n", name, token, (unsigned long long)sz, is_expression, (unsigned long long)(st->l + 1));
 
 			string_tokens_push(st, strdup(token), sz);
 		}
@@ -391,7 +391,7 @@ void compare_mem_lines_with_tokens(char *mem, size_t mem_len, string_tokens *st)
 	}
 
 	if (line_no < st->l) {
-		printf("too many tokens: lines in file %zu, tokens: %llu\n", line_no, st->l);
+		printf("too many tokens: lines in file %zu, tokens: %llu\n", line_no, (unsigned long long)st->l);
 	}
 }
 int amtail_lex_test(string *arg, char *name, amtail_log_level amtail_ll, string_tokens *st)

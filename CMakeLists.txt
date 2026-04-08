@@ -14,10 +14,34 @@ set(CMAKE_BUILD_TYPE Debug)
 set(HEAD ${PROJECT_NAME})
 
 # for speed check add -H -ftime-report
-set(CMAKE_C_FLAGS "-isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -Werror -Wall -Wno-implicit-function-declaration -Wno-char-subscripts -Wno-error=format-extra-args -Wno-error=format -Wno-variadic-macros -Wno-error=unused-result -Wno-undef -Wunreachable-code -Wno-unreachable-code -Wno-unused-variable -O3 -std=gnu11 -pthread -pg")
+set(CMAKE_C_FLAGS "-Werror -Wall -Wno-implicit-function-declaration -Wno-char-subscripts -Wno-error=format-extra-args -Wno-error=format -Wno-variadic-macros -Wno-error=unused-result -Wno-undef -Wunreachable-code -Wno-unreachable-code -Wno-unused-variable -O3 -std=gnu11 -pthread -pg -lbsd")
+if(APPLE)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk")
+endif()
+
+# Some environments leak -lbsd into CFLAGS; it must not be passed during compile.
+foreach(_flag_var
+        CMAKE_C_FLAGS
+        CMAKE_C_FLAGS_DEBUG
+        CMAKE_C_FLAGS_RELEASE
+        CMAKE_C_FLAGS_RELWITHDEBINFO
+        CMAKE_C_FLAGS_MINSIZEREL)
+    if(DEFINED ${_flag_var})
+        string(REPLACE "-lbsd" "" ${_flag_var} "${${_flag_var}}")
+    endif()
+endforeach()
+
+if(UNIX AND NOT APPLE)
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        # Linux clang may see linker-only args from environment (e.g. -lbsd) during compile.
+        add_compile_options(-Qunused-arguments -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument)
+    endif()
+endif()
 include_directories(/usr/local/include)
-include_directories(/opt/homebrew/Cellar/jansson/2.14.1/include/)
-include_directories(/System/Volumes/Data/opt/homebrew/Cellar/pcre/8.45/include/)
+if(APPLE)
+    include_directories(/opt/homebrew/Cellar/jansson/2.14.1/include/)
+    include_directories(/System/Volumes/Data/opt/homebrew/Cellar/pcre/8.45/include/)
+endif()
 include_directories(../alligator/src)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -57,7 +81,20 @@ add_executable(${HEAD} test.c
 
 set_target_properties(${HEAD} PROPERTIES C_STANDARD 11)
 
-target_link_libraries(${HEAD} ${COMMON} libpcre.a pthread)
+find_library(PCRE_LIB NAMES pcre HINTS /usr/lib64 /usr/lib /usr/local/lib)
+if(NOT PCRE_LIB)
+    message(FATAL_ERROR "PCRE library not found. Install pcre-devel (or equivalent).")
+endif()
+
+set(EXTRA_PLATFORM_LIBS "")
+if(UNIX AND NOT APPLE)
+    find_library(BSD_LIB NAMES bsd HINTS /usr/lib64 /usr/lib /usr/local/lib)
+    if(BSD_LIB)
+        list(APPEND EXTRA_PLATFORM_LIBS ${BSD_LIB})
+    endif()
+endif()
+
+target_link_libraries(${HEAD} ${COMMON} ${PCRE_LIB} pthread m ${EXTRA_PLATFORM_LIBS})
 
 set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
