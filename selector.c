@@ -513,3 +513,11 @@ void string_tokens_free(string_tokens *st)
 	free(st->str);
 	free(st);
 }
+string* string_string_init_dup(string *str)
+{
+	string *ret = malloc(sizeof(*ret));
+	ret->m = ret->l = str->l;
+	ret->s = strdup(str->s);
+
+	return ret;
+}

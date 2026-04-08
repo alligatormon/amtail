@@ -7,12 +7,6 @@
 
 void (*amtail_vmfunc[256])(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline);
 
-int amtail_variable_compare(const void* arg, const void* obj)
-{
-	char *s1 = (char*)arg;
-	char *s2 = ((amtail_variable*)obj)->key;
-	return strcmp(s1, s2);
-}
 
 amtail_byteop* amtail_vmstack_pop(amtail_thread *amt_thread)
 {
@@ -288,7 +282,7 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 
 void amtail_vmfunc_inc(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
 {
-	//printf("export name is %s\n", byte_ops->export_name->s);
+	printf("export name is %s\n", byte_ops->export_name->s);
 	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, byte_ops->export_name->s, amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l));
 	if (var)
 	{
@@ -417,7 +411,7 @@ int amtail_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_NOOP)
 	)
 	{
-		printf("\nbyte_ops %p code %d\n", byte_ops, byte_ops->opcode);
+		//printf("\nbyte_ops %p code %d\n", byte_ops, byte_ops->opcode);
 		amtail_vmfunc[byte_ops->opcode](amt_thread, byte_ops, variables, logline);
 	}
 	else
@@ -440,6 +434,23 @@ void amtail_bytecode_dump(amtail_bytecode* byte_code)
 		printf("\t[%"PRIu64"] hidden %d\n", i, byte_code->ops[i].hidden);
 		if (byte_code->ops[i].export_name)
 			printf("\t[%"PRIu64"] name '%s'\n", i, byte_code->ops[i].export_name->s);
+		if (byte_code->ops[i].opcode == AMTAIL_AST_OPCODE_VARIABLE && byte_code->ops[i].by_count) {
+			for (uint8_t j = 0; j < byte_code->ops[i].by_count; ++j)
+				printf("\t\tby [%"PRIu64"] var label %s\n", i, byte_code->ops[i].by[j]->s);
+		}
+		if (byte_code->ops[i].opcode == AMTAIL_AST_OPCODE_VARIABLE && byte_code->ops[i].bucket_count) {
+			for (uint8_t j = 0; j < byte_code->ops[i].bucket_count; ++j)
+				printf("\t\tbucket [%"PRIu64"] var label %s\n", i, byte_code->ops[i].bucket[j]->s);
+		}
+		if (byte_code->ops[i].opcode == AMTAIL_AST_OPCODE_VARIABLE && byte_code->ops[i].vartype == ALLIGATOR_VARTYPE_CONST) {
+			if (byte_code->ops[i].facttype == ALLIGATOR_FACTTYPE_INT)
+				printf("\t[%"PRIu64"] const int value: %"PRId64"\n", i, byte_code->ops[i].li);
+			else if (byte_code->ops[i].facttype == ALLIGATOR_FACTTYPE_DOUBLE)
+			printf("\t[%"PRIu64"] const double value: %f\n", i, byte_code->ops[i].ld);
+			else if (byte_code->ops[i].facttype == ALLIGATOR_FACTTYPE_TEXT)
+				printf("\t[%"PRIu64"] const text value: %s\n", i, byte_code->ops[i].ls->s);
+	
+		}
 		if (byte_code->ops[i].opcode == AMTAIL_AST_OPCODE_VAR && byte_code->ops[i].vartype == ALLIGATOR_VARTYPE_COUNTER)
 		{
 			printf("\t[%"PRIu64"] var counter left %"PRId64"\n", i, byte_code->ops[i].li);
@@ -470,21 +481,23 @@ int amtail_run(amtail_bytecode* byte_code, string* logline)
 
 	for (uint64_t cursym_log = 0, counter = 0; cursym_log < logline->l; ++cursym_log, ++counter)
 	{
-		printf("logline counter %llu\n", counter);
+		//printf("logline counter %llu\n", counter);
 		line_size = strcspn(logline->s + cursym_log, "\n");
 		while (amtail_vmstack_pop(amt_thread));
 		for (uint64_t i = 0; i < size; ++i)
 		{
 			rc = amtail_execute(amt_thread, &byte_ops[i], variables, logline);
+			printf("amtail_execute [%llu] returned %d\n", i, rc);
 			if (rc == 2) // branch
 			{
 				uint64_t new = amtail_branch_select(&byte_ops[i], variables, logline, cursym_log, line_size);
+				//printf("new branch select: %llu\n", new);
 				if (new)
 					i = new;
 			}
 			else if (!rc)
 			{
-				//printf("error execute on logline: '%s', %d\n", logline->s, rc);
+				printf("error execute on logline: '%s', %d\n", logline->s, rc);
 				return rc;
 			}
 		}

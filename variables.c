@@ -1,6 +1,7 @@
 #include "common/selector.h"
 #include "variables.h"
 #include "dstructures/tommy.h"
+#include <errno.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -47,6 +48,18 @@ void amtail_variables_dump_foreach(void *funcarg, void* arg)
 			string_uint(dst, var->i);
 		else if (var->type == ALLIGATOR_VARTYPE_GAUGE)
 			string_double(dst, var->d);
+		else if (var->type == ALLIGATOR_VARTYPE_CONST) {
+			if (var->facttype == ALLIGATOR_FACTTYPE_TEXT)
+				string_string_cat(dst, var->s);
+			else if (var->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
+				string_double(dst, var->d);
+			else if (var->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
+				string_int(dst, var->i);
+		}
+		else if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM)
+			string_double(dst, var->d);
+		else if (var->type == ALLIGATOR_VARTYPE_TEXT)
+			string_string_cat(dst, var->s);
 	}
 	string_cat(dst, "\n", 1);
 }
@@ -58,6 +71,39 @@ void amtail_variables_dump(alligator_ht *variables)
     printf("count of variables: %zu\n", alligator_ht_count(variables));
 
 	fprintf(stderr, "dst is\n%s\n", dst->s);
+}
+
+
+int amtail_variable_compare(const void* arg, const void* obj)
+{
+	char *s1 = (char*)arg;
+	char *s2 = ((amtail_variable*)obj)->key;
+	return strcmp(s1, s2);
+}
+
+int variable_parse_set_value(amtail_variable *var, string *s)
+{
+    char *end;
+    errno = 0;
+
+    int64_t iv = strtoll(s->s, &end, 10);
+    if (errno == 0 && *end == '\0') {
+        var->facttype = ALLIGATOR_FACTTYPE_INT;
+        var->i = iv;
+        return 1;
+    }
+
+    errno = 0;
+    double dv = strtod(s->s, &end);
+    if (errno == 0 && *end == '\0') {
+        var->facttype = ALLIGATOR_FACTTYPE_DOUBLE;
+        var->d = dv;
+        return 1;
+    }
+
+    var->facttype = ALLIGATOR_FACTTYPE_TEXT;
+    var->s = string_string_init_dup(s);
+    return 1;
 }
 
 amtail_variable* amtail_variable_make(uint8_t hidden, uint8_t vartype, char *key, string *export_name, string **by, uint8_t by_count, uint8_t* by_positions)
@@ -76,5 +122,7 @@ amtail_variable* amtail_variable_make(uint8_t hidden, uint8_t vartype, char *key
 
 inline uint32_t amtail_hash(char *str, uint64_t syms)
 {
-	return (uint32_t)(str[0] + str[syms]);
+	if (!str || !syms)
+		return 0;
+	return (uint32_t)(((uint8_t)str[0] * 33u) + (uint8_t)str[syms - 1]);
 }

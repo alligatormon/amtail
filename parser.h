@@ -6,6 +6,9 @@
 #define ALLIGATOR_VARTYPE_TEXT 2
 #define ALLIGATOR_VARTYPE_CONST 3
 #define ALLIGATOR_VARTYPE_HISTOGRAM 4
+#define ALLIGATOR_FACTTYPE_INT 0
+#define ALLIGATOR_FACTTYPE_DOUBLE 1
+#define ALLIGATOR_FACTTYPE_TEXT 2
 #define AMTAIL_AST_LEFT 0
 #define AMTAIL_AST_RIGHT 1
 
@@ -39,30 +42,34 @@
 #define AMTAIL_AST_OPCODE_GE 26
 #define AMTAIL_AST_OPCODE_EQ 27
 #define AMTAIL_AST_OPCODE_NE 28
-#define AMTAIL_AST_OPCODE_FUNC_STRPTIME 29 // strptime
-#define AMTAIL_AST_OPCODE_FUNC_TIMESTAMP 30 // timestamp
-#define AMTAIL_AST_OPCODE_FUNC_TOLOWER 31 // tolower
-#define AMTAIL_AST_OPCODE_FUNC_LEN 32 // len
-#define AMTAIL_AST_OPCODE_FUNC_STRTOL 33 // strtol
-#define AMTAIL_AST_OPCODE_FUNC_SETTIME 34 // settime
-#define AMTAIL_AST_OPCODE_FUNC_GETFILENAME 35 // getfilename
-#define AMTAIL_AST_OPCODE_FUNC_INT 36 // int
-#define AMTAIL_AST_OPCODE_FUNC_BOOL 37 // bool
-#define AMTAIL_AST_OPCODE_FUNC_FLOAT 38 // float
-#define AMTAIL_AST_OPCODE_FUNC_STRING 39 // string
-#define AMTAIL_AST_OPCODE_FUNC_SUBST 40 //subst
-#define AMTAIL_AST_OPCODE_REGEX 41
-#define AMTAIL_AST_OPCODE_VAR 42 // use variable
-#define AMTAIL_AST_OPCODE_RUN 43 // expression is ended, should be calculate and assign
+#define AMTAIL_AST_OPCODE_NOT 29 // !
+#define AMTAIL_AST_OPCODE_FUNC_STRPTIME 30 // strptime
+#define AMTAIL_AST_OPCODE_FUNC_TIMESTAMP 31 // timestamp
+#define AMTAIL_AST_OPCODE_FUNC_TOLOWER 32 // tolower
+#define AMTAIL_AST_OPCODE_FUNC_LEN 33 // len
+#define AMTAIL_AST_OPCODE_FUNC_STRTOL 34 // strtol
+#define AMTAIL_AST_OPCODE_FUNC_SETTIME 35 // settime
+#define AMTAIL_AST_OPCODE_FUNC_GETFILENAME 36 // getfilename
+#define AMTAIL_AST_OPCODE_FUNC_INT 37 // int
+#define AMTAIL_AST_OPCODE_FUNC_BOOL 38 // bool
+#define AMTAIL_AST_OPCODE_FUNC_FLOAT 39 // float
+#define AMTAIL_AST_OPCODE_FUNC_STRING 40 // string
+#define AMTAIL_AST_OPCODE_FUNC_SUBST 41 //subst
+#define AMTAIL_AST_OPCODE_REGEX 42
+#define AMTAIL_AST_OPCODE_VAR 43 // use variable
+#define AMTAIL_AST_OPCODE_RUN 44 // expression is ended, should be calculate and assign
 
 typedef struct amtail_ast {
 	enum { gauge, counter } tag;
 	string *name;
 	string *export_name;
 	string *by[256];
+	string *bucket[256];
 	uint8_t by_count;
+	uint8_t bucket_count;
 	uint8_t opcode;
 	uint8_t vartype;
+	uint8_t facttype;
 	uint8_t hidden;
 	union {
 		double dvalue;
@@ -74,6 +81,14 @@ typedef struct amtail_ast {
 	struct amtail_ast *tail; //for stack
 	struct amtail_ast *prev; //for stack
 } amtail_ast;
+
+typedef struct parser_state {
+	uint8_t variable_by;
+	uint8_t variable_bucket;
+	uint8_t expression;
+	uint8_t branch;
+} parser_state;
+
 
 typedef struct calculation_t {
 	union {
@@ -97,3 +112,4 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 void amtail_ast_free(amtail_ast *ast);
 void amtail_ast_print(amtail_ast *ast, uint64_t indent);
 char *opname_from_code(uint64_t opcode);
+void amtail_parser_init();

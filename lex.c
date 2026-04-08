@@ -330,7 +330,11 @@ string_tokens* amtail_lex(string *arg, char *name, amtail_log_level amtail_ll)
 	if (amtail_ll.lexer > 0)
 		printf("=======\nstart lexer\n========");
 	file *a = readfile(arg->s);
-	printf("'%s'\n", a->mem);
+	if (!a || !a->mem)
+		return NULL;
+
+	if (amtail_ll.lexer > 1)
+		printf("'%s'\n", a->mem);
 
 	string_tokens *st = string_tokens_new();
 

@@ -2,6 +2,7 @@
 #include <string.h>
 //#include "sstring.h"
 #include "parser.h"
+#include "variables.h"
 #define AMTAIL_INDENT_MAX_SIZE 4096
 
 amtail_ast* amtail_ast_init()
@@ -148,9 +149,19 @@ char *hiden_visible(uint8_t hidden)
 	return hidden ? "hidden" : "visible";
 }
 
+char **allvartypes;
+void amtail_parser_init() {
+	allvartypes = calloc(1, 5 * sizeof(void*));
+	allvartypes[ALLIGATOR_VARTYPE_COUNTER] = "counter";
+	allvartypes[ALLIGATOR_VARTYPE_GAUGE] = "gauge";
+	allvartypes[ALLIGATOR_VARTYPE_TEXT] = "text";
+	allvartypes[ALLIGATOR_VARTYPE_CONST] = "const";
+	allvartypes[ALLIGATOR_VARTYPE_HISTOGRAM] = "histogram";
+}
+
 char *vartype_get(uint8_t vartype)
 {
-	return vartype ? "counter" : "gauge";
+	return allvartypes[vartype];
 }
 
 int dec_identy(uint64_t *identy)
@@ -194,7 +205,7 @@ calculation_cluster* calculation_new(uint64_t size) {
 	ret->smax = size;
 	ret->scur = 0;
 
-	printf("CC return %p\n", ret);
+	//printf("CC return %p\n", ret);
 	return ret;
 }
 
@@ -242,6 +253,18 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 
 	printf("calculation_flush!\n");
 	amtail_ast *cur = *ccur;
+
+	if (!cur)
+	{
+		cur = amtail_ast_init();
+		if (!cur)
+		{
+			printf("error: failed to create AST node in calculation_flush\n");
+			*calculation_ptr = NULL;
+			return;
+		}
+		*ccur = cur;
+	}
 
 	calculation_cluster *calculation_expr = *calculation_ptr;
 
@@ -326,23 +349,54 @@ int is_calculation_op(char op)
 }
 // shunting yard end
 
+void state_flush(uint8_t *dst, uint8_t *st) {
+	if (*st)
+		*dst = *st - 1;
+	*st = 0;
+}
+
+static string* amtail_collect_lhs_tokens(string_tokens *tokens, uint64_t op_index)
+{
+	if (!tokens || op_index == 0 || op_index > tokens->l)
+		return NULL;
+
+	uint64_t start = op_index;
+	while (start > 0)
+	{
+		char *prev = tokens->str[start - 1]->s;
+		if (!strcmp(prev, "\n") || !strcmp(prev, "{") || !strcmp(prev, "}"))
+			break;
+		--start;
+	}
+
+	string *lhs = string_new();
+	for (uint64_t i = start; i < op_index; ++i)
+	{
+		char *t = tokens->str[i]->s;
+		if (!strcmp(t, ","))
+			continue;
+		string_string_cat(lhs, tokens->str[i]);
+	}
+
+	if (!lhs->l)
+	{
+		string_free(lhs);
+		return NULL;
+	}
+
+	return lhs;
+}
+
+
+
+
 amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level amtail_ll)
 {
-	//amtail_ast *funcs = amtail_ast_init();
 	amtail_ast *ast = amtail_ast_init();
 	amtail_ast *stack = amtail_ast_init();
 	amtail_ast *cur = ast;
 	uint64_t identy = 0;
-	uint8_t begin = 1;
-	uint8_t otherwise = 0;
-	uint8_t e_else = 0;
-	uint8_t func_declaration = 0;
-	uint8_t func_call = 0;
-
-	uint8_t expression = 0;
-	string *expr = string_new();
-	uint8_t hidden = 0;
-	uint8_t vartype = 0;
+	alligator_ht *const_data = alligator_ht_init(NULL);
 	calculation_cluster *calculation_expr = NULL;
 	uint8_t calculation_op[255];
 	memset(calculation_op, 0, 255);
@@ -355,302 +409,84 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 	calculation_op['-'] = 5;
 	calculation_op['('] = 0;
 	calculation_op[')'] = 0;
-	//struct operator_type startop={'X', 0, ASSOC_NONE, 0, NULL};
 	char calculation_lastop = 0;
+	string *last_token = NULL;
+	parser_state pstate;
+	memset(&pstate, 0, sizeof(pstate));
 
 	if (amtail_ll.parser)
 		puts("\t<====> PARSER STAGE <====>");
 
 	for (uint64_t i = 0; i < tokens->l; i++)
 	{
-		for (uint64_t ii = 0; ii < identy; ii++, printf("\t"));
-		printf("i=%"PRIi64", identy %"PRIu64"\n", i, identy);
-		for (uint64_t ii = 0; ii < identy; ii++, printf("\t"));
-		printf("%llu: '%s'\n", i, tokens->str[i]->s);
-		if (!strcmp(tokens->str[i]->s, "counter"))
+		string *tok = tokens->str[i];
+		char *t = tok->s;
+
+		if (amtail_ll.parser > 1)
+			printf("token[%"PRIu64"] '%s'\n", i, t);
+
+		if (!strcmp(t, "\n"))
 		{
-			++i;
-			vartype = ALLIGATOR_VARTYPE_COUNTER;
-			if (amtail_ll.parser > 0)
-				printf("[%s] %s name [%"PRIu64"]: '%s'\n", hiden_visible(hidden), vartype_get(vartype), i, tokens->str[i]->s);
-
-			cur->name = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l);
-			cur->opcode = AMTAIL_AST_OPCODE_VARIABLE;
-			cur->vartype = ALLIGATOR_VARTYPE_COUNTER;
-			cur->hidden = hidden;
-
-			hidden = 0;
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "gauge"))
-		{
-			++i;
-			vartype = ALLIGATOR_VARTYPE_GAUGE;
-			if (amtail_ll.parser > 0)
-				printf("[%s] %s name [%"PRIu64"]: '%s'\n", hiden_visible(hidden), vartype_get(vartype), i, tokens->str[i]->s);
-
-			cur->name = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l);
-			cur->opcode = AMTAIL_AST_OPCODE_VARIABLE;
-			cur->vartype = ALLIGATOR_VARTYPE_GAUGE;
-			cur->hidden = hidden;
-
-			hidden = 0;
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "hidden"))
-		{
-			if (amtail_ll.parser > 0)
-				printf("name '%s', [%"PRIu64"] add parameter 'hidden'\n", cur->name->s, i);
-
-			hidden = 1;
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "as"))
-		{
-			++i;
-			if (amtail_ll.parser > 0)
-				printf("%s export name [%"PRIu64"]: '%s'\n", vartype_get(vartype), i, tokens->str[i]->s);
-
-			cur->export_name = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l);
-		}
-		else if (!strcmp(tokens->str[i]->s, "by"))
-		{
-			uint64_t j = 0;
-			for (++i; strcmp(tokens->str[i]->s, "\n"); ++i, ++j)
+			if (!cur)
 			{
-                if (tokens->str[i]->s[tokens->str[i]->l-1] == ',')
-                    tokens->str[i]->s[--tokens->str[i]->l] = 0;
-
-				if (amtail_ll.parser > 0)
-					printf("by [%"PRIu64"]: '%s'(%zu)\n", i, tokens->str[i]->s, tokens->str[i]->l);
-
-				cur->by[j] = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l);
+				cur = amtail_ast_init();
+				if (!cur)
+					return NULL;
 			}
-			cur->by_count = j;
 
-			--i;
-		}
-		else if (!strcmp(tokens->str[i]->s, "const"))
-		{
-			++i;
-			vartype = ALLIGATOR_VARTYPE_TEXT;
+			if (calculation_expr)
+			{
+				calculation_flush(&calculation_expr, stack, &cur);
+				pstate.expression = 0;
+				calculation_lastop = 0;
+			}
 
-			if (amtail_ll.parser > 0)
-				printf("const data [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
+			state_flush(&cur->by_count, &pstate.variable_by);
+			state_flush(&cur->bucket_count, &pstate.variable_bucket);
+			pstate.branch = 0;
+			last_token = NULL;
 
-			cur->name = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l);
-			cur->opcode = AMTAIL_AST_OPCODE_VARIABLE;
-			cur->vartype = ALLIGATOR_VARTYPE_CONST;
-			cur->hidden = hidden;
-
-			++i;
-			cur->svalue = string_new();
-			string_string_copy(cur->svalue, tokens->str[i]);
-
-			hidden = 0;
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "text"))
-		{
-			++i;
-			vartype = ALLIGATOR_VARTYPE_TEXT;
-
-			if (amtail_ll.parser > 0)
-				printf("text name [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
-
-			cur->name = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l);
-			cur->opcode = AMTAIL_AST_OPCODE_VARIABLE;
-			cur->vartype = ALLIGATOR_VARTYPE_TEXT;
-			cur->hidden = hidden;
-			cur->svalue = string_new();
-
-			hidden = 0;
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "def"))
-		{
-			++i;
-
-			if (amtail_ll.parser > 0)
-				printf("function declaration [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
-
-			func_declaration = 1;
-			cur->name = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l);
-			//string_string_cat(expr, tokens->str[i]);
-			cur->opcode = AMTAIL_AST_OPCODE_FUNC_DECLARATION;
-			expression = 0;
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (tokens->str[i]->s[0] != '/' && strstr(tokens->str[i]->s, "="))
-		{
-			calculation_expr = calculation_new(255);
-			expression = 0;
-			if (amtail_ll.parser > 0)
-				printf("assign [%"PRIu64"]: '%s'\n", i, expr->s);
-
-			expression = 1;
-			cur->name = string_init_alloc(expr->s, expr->l);
-			cur->opcode = AMTAIL_AST_OPCODE_ASSIGN;
-
-			amtail_ast_stack_push(stack, cur);
-			cur->stem = amtail_ast_multi_init(2);
-			cur = cur->stem[AMTAIL_AST_LEFT];
-			string_null(expr);
-			//++i;
-		}
-		else if (tokens->str[i]->s[0] != '/' && strstr(tokens->str[i]->s, "++") && tokens->str[i]->l > 2)
-		{
-			cur->opcode = AMTAIL_AST_OPCODE_INC;
-			cur->name = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l - 3);
-
-			if (amtail_ll.parser > 0)
-				printf("increment [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
-		}
-		else if (strstr(tokens->str[i]->s, "++") && tokens->str[i]->l == 2)
-		{
-			cur->opcode = AMTAIL_AST_OPCODE_INC;
-
-			if (amtail_ll.parser > 0)
-				printf("increment without name [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
-		}
-		else if (tokens->str[i]->s[0] != '/' && strstr(tokens->str[i]->s, "--"))
-		{
-			cur->opcode = AMTAIL_AST_OPCODE_DEC;
-
-			if (amtail_ll.parser > 0)
-				printf("decrement [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
-		}
-		else if (!strcmp(tokens->str[i]->s, "\n")) // NEWLINE
-		{
-			if (cur && cur->name)
+			if (cur->opcode != AMTAIL_AST_OPCODE_NOOP || cur->name || cur->export_name)
 			{
 				cur->stem = amtail_ast_multi_init(1);
 				if (cur->stem && cur->stem[AMTAIL_AST_LEFT])
 					cur = cur->stem[AMTAIL_AST_LEFT];
 				else
 				{
-					if (amtail_ll.parser > 0)
-						printf("warning: failed to create new AST node for NEWLINE at token %"PRIu64"\n", i);
+					if (amtail_ll.parser)
+						printf("warning: failed to allocate AST line node at %"PRIu64"\n", i);
 					cur = NULL;
+					break;
 				}
 			}
+			continue;
+		}
 
-			if (amtail_ll.parser > 1)
-				printf("NEWLINE [%"PRIu64"]: '%s'\n", i, (cur && cur->name ? cur->name->s : "NULL"));
+		if (!strcmp(t, "{"))
+		{
+			++identy;
+			cur->opcode = AMTAIL_AST_OPCODE_BRANCH;
+			pstate.branch = 0;
 
-			hidden = 0;
-			vartype = 0;
+			amtail_ast_stack_push(stack, cur);
+			cur->stem = amtail_ast_multi_init(2);
+			cur = cur->stem[AMTAIL_AST_LEFT];
+			continue;
 		}
-		else if (!strcmp(tokens->str[i]->s, "next"))
-		{
-			if (amtail_ll.parser > 0)
-				printf("NEXT [%"PRIu64"]\n", i);
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "stop"))
-		{
-			if (amtail_ll.parser > 0)
-				printf("STOP [%"PRIu64"]\n", i);
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "else"))
-		{
-			if (amtail_ll.parser > 0)
-				printf("ELSE [%"PRIu64"]\n", i);
 
-			e_else = 1;
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "otherwise"))
+		if (!strcmp(t, "}"))
 		{
-			if (amtail_ll.parser > 0)
-				printf("OTHERWISE [%"PRIu64"]\n", i);
-
-			otherwise = 1;
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "del"))
-		{
-			if (amtail_ll.parser > 0)
-				printf("DEL [%"PRIu64"]\n", i);
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "{"))
-		{
-			if (expression || otherwise || e_else)
+			if (calculation_expr)
 			{
-				if (amtail_ll.parser > 0)
-				{
-					puts("\t\t!!! {");
-					printf("full expr is '%s'\n", expr->s);
-				}
-
-				cur->name = string_init_alloc(expr->s, expr->l);
-				cur->opcode = AMTAIL_AST_OPCODE_BRANCH;
-
-				amtail_ast_stack_push(stack, cur);
-				cur->stem = amtail_ast_multi_init(2);
-
-				if (amtail_ll.parser > 0)
-					printf("PUSH cur %p/%p PP %p/%p %"PRIu64"\n", cur, cur->stem, cur->stem[AMTAIL_AST_LEFT], cur->stem[AMTAIL_AST_RIGHT], identy);
-
-				cur = cur->stem[AMTAIL_AST_LEFT];
-				string_null(expr);
-				++identy;
-
-				expression = 0;
-				otherwise = 0;
-				e_else = 0;
+				calculation_flush(&calculation_expr, stack, &cur);
+				pstate.expression = 0;
+				calculation_lastop = 0;
 			}
-			else if (func_declaration)
-			{
-				//cur->name = string_init_alloc(expr->s, expr->l);
-				cur->opcode = AMTAIL_AST_OPCODE_FUNC_DECLARATION;
-
-				if (amtail_ll.parser > 0)
-					printf("func declaration is '%s'\n", cur->name->s);
-
-				amtail_ast_stack_push(stack, cur);
-				cur->stem = amtail_ast_multi_init(2);
-				cur = cur->stem[AMTAIL_AST_LEFT];
-				//string_null(expr);
-				++identy;
-
-				func_declaration = 0;
-			}
-			else if (func_call)
-			{
-				//cur->name = string_init_alloc(expr->s, expr->l);
-				cur->opcode = AMTAIL_AST_OPCODE_FUNC_DECLARATION;
-
-				if (amtail_ll.parser > 0)
-					printf("func call is '%s'\n", cur->name->s);
-
-				amtail_ast_stack_push(stack, cur);
-				cur->stem = amtail_ast_multi_init(2);
-				cur = cur->stem[AMTAIL_AST_LEFT];
-				//string_null(expr);
-				++identy;
-
-				func_call = 0;
-			}
-			else
-			{
-				if (amtail_ll.parser > 0)
-					puts("unknown!");
-			}
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (!strcmp(tokens->str[i]->s, "}"))
-		{
-			if (amtail_ll.parser > 0)
-				puts("\t\t!!! }");
 
 			if (!dec_identy(&identy))
 			{
-				if (amtail_ll.parser > 0)
-					printf("panic '%s'!!!\n", name);
-
+				if (amtail_ll.parser)
+					printf("panic '%s': unexpected '}'\n", name);
 				amtail_parser_print_stack(tokens, i);
 				return NULL;
 			}
@@ -658,39 +494,177 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			cur = amtail_ast_stack_pop(stack);
 			if (!cur)
 			{
-				if (amtail_ll.parser > 0)
-					printf("panic2 '%s'!!!\n", name);
-
+				if (amtail_ll.parser)
+					printf("panic2 '%s': parser stack underflow\n", name);
 				amtail_parser_print_stack(tokens, i);
 				return NULL;
 			}
-
-			if (amtail_ll.parser > 0)
-				printf("%s POP cur %p/%p PP %p/%p %"PRIu64"\n", name, cur, cur->stem, cur->stem[AMTAIL_AST_LEFT], cur->stem[AMTAIL_AST_RIGHT], identy);
-
-			cur = cur->stem[AMTAIL_AST_RIGHT];
-			calculation_flush(&calculation_expr, stack, &cur);
-		}
-		else if (*tokens->str[i]->s == '@')
-		{
-			if (amtail_ll.parser > 0)
-				printf("decorator_call [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
-
-			func_call = 1;
-			//string_string_cat(expr, tokens->str[i]);
-			cur->name = string_init_alloc(tokens->str[i]->s, tokens->str[i]->l);
-			cur->opcode = AMTAIL_AST_OPCODE_FUNC_CALL;
-			expression = 0;
-		}
-		else if (calculation_expr)
-		{
-			if (amtail_ll.parser > 0)
-				printf("calculation [%"PRIu64"]: '%s' type: %d\n", i, tokens->str[i]->s, cur->opcode);
-
-			if (is_calculation_op(*tokens->str[i]->s))
+			if (!cur->stem || !cur->stem[AMTAIL_AST_RIGHT])
 			{
-				char curop = calculation_op[*tokens->str[i]->s];
-				printf("> curop %d, calculation_lastop %d\n", curop, calculation_lastop);
+				if (!cur->stem)
+					cur->stem = amtail_ast_multi_init(2);
+				cur = cur->stem[AMTAIL_AST_RIGHT];
+			}
+			else
+			{
+				cur = cur->stem[AMTAIL_AST_RIGHT];
+			}
+			continue;
+		}
+
+		if (!strcmp(t, "hidden"))
+		{
+			cur->hidden = 1;
+			continue;
+		}
+		if (!strcmp(t, "def"))
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_FUNC_DECLARATION;
+			if (i + 1 < tokens->l && strcmp(tokens->str[i + 1]->s, "\n"))
+			{
+				++i;
+				cur->name = string_string_init_dup(tokens->str[i]);
+			}
+			continue;
+		}
+		if (t[0] == '@')
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_FUNC_CALL;
+			cur->name = string_string_init_dup(tok);
+			last_token = tok;
+			continue;
+		}
+		if (!strcmp(t, "counter"))
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_VARIABLE;
+			cur->vartype = ALLIGATOR_VARTYPE_COUNTER;
+			continue;
+		}
+		if (!strcmp(t, "gauge"))
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_VARIABLE;
+			cur->vartype = ALLIGATOR_VARTYPE_GAUGE;
+			continue;
+		}
+		if (!strcmp(t, "histogram"))
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_VARIABLE;
+			cur->vartype = ALLIGATOR_VARTYPE_HISTOGRAM;
+			continue;
+		}
+		if (!strcmp(t, "const"))
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_VARIABLE;
+			cur->vartype = ALLIGATOR_VARTYPE_CONST;
+			cur->hidden = 1;
+			continue;
+		}
+
+		if (!strcmp(t, "by"))
+		{
+			++pstate.variable_by;
+			state_flush(&cur->bucket_count, &pstate.variable_bucket);
+			continue;
+		}
+		if ((!strcmp(t, "bucket") || !strcmp(t, "buckets")) && cur->vartype == ALLIGATOR_VARTYPE_HISTOGRAM)
+		{
+			++pstate.variable_bucket;
+			state_flush(&cur->by_count, &pstate.variable_by);
+			continue;
+		}
+
+		if (pstate.variable_by)
+		{
+			cur->by[pstate.variable_by++ - 1] = string_init_alloc(tok->s, tok->l);
+			continue;
+		}
+		if (pstate.variable_bucket)
+		{
+			cur->bucket[pstate.variable_bucket++ - 1] = string_init_alloc(tok->s, tok->l);
+			continue;
+		}
+
+		if (cur->opcode == AMTAIL_AST_OPCODE_VARIABLE && !cur->name)
+		{
+			cur->name = string_string_init_dup(tok);
+			if (amtail_ll.parser)
+				printf("parsed variable [%s] %s [%"PRIu64"]: '%s'\n",
+				       hiden_visible(cur->hidden), vartype_get(cur->vartype), i, t);
+			continue;
+		}
+
+		if (cur->opcode == AMTAIL_AST_OPCODE_VARIABLE && cur->vartype == ALLIGATOR_VARTYPE_CONST && cur->name)
+		{
+			uint32_t name_hash = amtail_hash(cur->name->s, cur->name->l);
+			amtail_variable *var = amtail_variable_make(1, cur->vartype, cur->name->s, NULL, NULL, 0, 0);
+			variable_parse_set_value(var, tok);
+			alligator_ht_insert(const_data, &(var->node), var, name_hash);
+
+			cur->facttype = var->facttype;
+			if (var->facttype == ALLIGATOR_FACTTYPE_INT)
+				cur->ivalue = var->i;
+			else if (var->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
+				cur->dvalue = var->d;
+			else if (var->facttype == ALLIGATOR_FACTTYPE_TEXT)
+				cur->svalue = string_string_init_dup(var->s);
+			continue;
+		}
+
+		/* Parse action statements */
+		if (!strcmp(t, "stop"))
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_FUNC_STOP;
+			last_token = tok;
+			continue;
+		}
+		if (!strcmp(t, "next"))
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_FUNC_JMP;
+			last_token = tok;
+			continue;
+		}
+		if (!strcmp(t, "otherwise"))
+		{
+			/*
+			 * else-like branch marker; keep it explicit in AST so codegen/vm
+			 * can wire control-flow later.
+			 */
+			cur->opcode = AMTAIL_AST_OPCODE_FUNC_CMP;
+			cur->name = string_init_alloc("otherwise", 9);
+			last_token = tok;
+			continue;
+		}
+
+		if (!strcmp(t, "=") || !strcmp(t, "+=") || !strcmp(t, "-=") || !strcmp(t, "*=") || !strcmp(t, "/="))
+		{
+			string *lhs = amtail_collect_lhs_tokens(tokens, i);
+			if (!lhs)
+				continue;
+
+			cur->opcode = AMTAIL_AST_OPCODE_ASSIGN;
+			cur->name = lhs;
+			amtail_ast_stack_push(stack, cur);
+			cur->stem = amtail_ast_multi_init(2);
+			cur = cur->stem[AMTAIL_AST_LEFT];
+
+			calculation_expr = calculation_new(255);
+			pstate.expression = 1;
+			calculation_lastop = 0;
+
+			if (!strcmp(t, "+=") || !strcmp(t, "-=") || !strcmp(t, "*=") || !strcmp(t, "/="))
+			{
+				calculation_push_queue(calculation_expr, lhs->s, lhs->l);
+				calculation_push_stack(calculation_expr, t[0]);
+				calculation_lastop = calculation_op[(uint8_t)t[0]];
+			}
+			continue;
+		}
+
+		if (pstate.expression && calculation_expr)
+		{
+			if (is_calculation_op(t[0]) && t[1] == '\0')
+			{
+				char curop = calculation_op[(uint8_t)t[0]];
 				if (curop < calculation_lastop)
 				{
 					while (curop < calculation_lastop)
@@ -698,57 +672,150 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 						char elem = calculation_pop_stack(calculation_expr);
 						if (!elem)
 							break;
-
 						calculation_push_queue(calculation_expr, &elem, 1);
-						calculation_lastop = calculation_op[calculation_peek_stack(calculation_expr)];
-						printf(">> curop %d, calculation_lastop %d\n", curop, calculation_lastop);
+						if (calculation_expr->scur < 1)
+						{
+							calculation_lastop = 0;
+							break;
+						}
+						calculation_lastop = calculation_op[(uint8_t)calculation_peek_stack(calculation_expr)];
 					}
-					calculation_push_stack(calculation_expr, *tokens->str[i]->s);
-					calculation_lastop = curop;
 				}
-				else
-				{
-					calculation_push_stack(calculation_expr, *tokens->str[i]->s);
-					calculation_lastop = curop;
-				}
+				calculation_push_stack(calculation_expr, t[0]);
+				calculation_lastop = curop;
 			}
 			else
 			{
-				calculation_push_queue(calculation_expr, tokens->str[i]->s, tokens->str[i]->l);
+				calculation_push_queue(calculation_expr, tok->s, tok->l);
 			}
+			last_token = tok;
+			continue;
 		}
-		else if (begin)
+
+		/* Parse condition operators used before branch blocks. */
+		if (!strcmp(t, "<") || !strcmp(t, "<=") || !strcmp(t, ">") || !strcmp(t, ">=") ||
+		    !strcmp(t, "==") || !strcmp(t, "!=") || !strcmp(t, "=~") || !strcmp(t, "!~") ||
+		    !strcmp(t, "&&") || !strcmp(t, "||") || !strcmp(t, "!"))
 		{
-			if (amtail_ll.parser > 0)
-				printf("expression [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
+			if (!strcmp(t, "<"))
+				cur->opcode = AMTAIL_AST_OPCODE_LT;
+			else if (!strcmp(t, "<="))
+				cur->opcode = AMTAIL_AST_OPCODE_LE;
+			else if (!strcmp(t, ">"))
+				cur->opcode = AMTAIL_AST_OPCODE_GT;
+			else if (!strcmp(t, ">="))
+				cur->opcode = AMTAIL_AST_OPCODE_GE;
+			else if (!strcmp(t, "=="))
+				cur->opcode = AMTAIL_AST_OPCODE_EQ;
+			else if (!strcmp(t, "!="))
+				cur->opcode = AMTAIL_AST_OPCODE_NE;
+			else if (!strcmp(t, "=~"))
+				cur->opcode = AMTAIL_AST_OPCODE_MATCH;
+			else if (!strcmp(t, "!~"))
+				cur->opcode = AMTAIL_AST_OPCODE_NOTMATCH;
+			else if (!strcmp(t, "&&"))
+				cur->opcode = AMTAIL_AST_OPCODE_AND;
+			else if (!strcmp(t, "||"))
+				cur->opcode = AMTAIL_AST_OPCODE_OR;
+			else
+				cur->opcode = AMTAIL_AST_OPCODE_NOT;
 
-			expression = 1;
-			string_string_cat(expr, tokens->str[i]);
+			if (!cur->name)
+				cur->name = string_new();
+
+			if (last_token)
+				string_string_cat(cur->name, last_token);
+
+			if (i + 1 < tokens->l && strcmp(tokens->str[i + 1]->s, "\n") && strcmp(tokens->str[i + 1]->s, "{"))
+			{
+				string_cat(cur->name, " ", 1);
+				string_string_cat(cur->name, tokens->str[i + 1]);
+				++i;
+			}
+
+			pstate.branch = 1;
+			last_token = tok;
+			continue;
 		}
-		else if (expression)
+
+		if (!strcmp(t, "++") && last_token)
 		{
-			string_cat(expr, " ", 1);
-			string_string_cat(expr, tokens->str[i]);
-
-			if (amtail_ll.parser > 0)
-				printf("internal expression [%"PRIu64"]: '%s' / (%p)\n", i, tokens->str[i]->s, expr->s );
+			string *lhs = amtail_collect_lhs_tokens(tokens, i);
+			if (!lhs)
+				lhs = string_string_init_dup(last_token);
+			cur->opcode = AMTAIL_AST_OPCODE_INC;
+			cur->name = lhs;
+			last_token = tok;
+			continue;
 		}
-		else
-			if (amtail_ll.parser > 0)
-				printf("tok [%"PRIu64"]: '%s'\n", i, tokens->str[i]->s);
 
-		if (!strcmp(tokens->str[i]->s, "\n"))
-        {
-			begin = 1;
-			calculation_flush(&calculation_expr, stack, &cur);
-	    }
-		else
-			begin = 0;
+		if (!strcmp(t, "--") && last_token)
+		{
+			string *lhs = amtail_collect_lhs_tokens(tokens, i);
+			if (!lhs)
+				lhs = string_string_init_dup(last_token);
+			cur->opcode = AMTAIL_AST_OPCODE_DEC;
+			cur->name = lhs;
+			last_token = tok;
+			continue;
+		}
 
+		if (tok->l > 2 && strstr(t, "++") == t + tok->l - 2)
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_INC;
+			cur->name = string_init_alloc(tok->s, tok->l - 2);
+			last_token = tok;
+			continue;
+		}
+
+		if (tok->l > 2 && strstr(t, "--") == t + tok->l - 2)
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_DEC;
+			cur->name = string_init_alloc(tok->s, tok->l - 2);
+			last_token = tok;
+			continue;
+		}
+
+		if (t[0] == '/' || (!pstate.expression && t[0] == '+') || pstate.branch ||
+			alligator_ht_search(const_data, amtail_variable_compare, t, amtail_hash(t, tok->l)))
+		{
+			pstate.branch = 1;
+			if (!strcmp(t, "//") || !strcmp(t, "+"))
+				continue;
+
+			if (!cur->name)
+				cur->name = string_new();
+
+			if (t[0] == '/')
+			{
+				if (t[tok->l - 1] == '/')
+					string_cat(cur->name, t + 1, tok->l - 2);
+				else
+					string_string_cat(cur->name, tok);
+			}
+			else
+			{
+				amtail_variable *v = alligator_ht_search(const_data, amtail_variable_compare, t, amtail_hash(t, tok->l));
+				if (!v)
+					continue;
+
+				if (v->facttype == ALLIGATOR_FACTTYPE_TEXT && v->s->l >= 2 && v->s->s[0] == '/' && v->s->s[v->s->l - 1] == '/')
+					string_cat(cur->name, v->s->s + 1, v->s->l - 2);
+				else if (v->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
+					string_double(cur->name, v->d);
+				else if (v->facttype == ALLIGATOR_FACTTYPE_INT)
+					string_int(cur->name, v->i);
+				else if (v->facttype == ALLIGATOR_FACTTYPE_TEXT)
+					string_string_cat(cur->name, v->s);
+			}
+			continue;
+		}
+
+		last_token = tok;
 	}
-	calculation_flush(&calculation_expr, stack, &cur);
 
-	string_free(expr);
+	if (calculation_expr)
+		calculation_flush(&calculation_expr, stack, &cur);
 
 	if (amtail_ll.parser)
 		puts("\t<-----> END PARSER <----->");

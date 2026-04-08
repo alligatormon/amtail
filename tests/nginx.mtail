@@ -7,7 +7,7 @@ gauge right by name, count, code, len
 	sub++;
 }
 
-/books.example.com/ {
+/qatar22.championat.com/ {
     books++;
     /(?P<code>[0-9]*) [0-9]* .https://gmail.ru/ {
         right["12"]["13"]["14"]["15"] = 19.12 * 20 + 11 ^ 3 / 25

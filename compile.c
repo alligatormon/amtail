@@ -36,7 +36,9 @@ amtail_bytecode* amtail_compile(char *name, string *str, amtail_log_level amtail
 	if (amtail_ll.compiler > 0)
 		amtail_ast_print(ast, 0);
 
+
 	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
+	printf("debug! byte code len %llu\n", byte_code->l);
 	if (!byte_code)
 	{
 		if (amtail_ll.compiler > 0)
@@ -46,7 +48,7 @@ amtail_bytecode* amtail_compile(char *name, string *str, amtail_log_level amtail
 		amtail_ast_free(ast);
 		return 0;
 	}
-
+	//exit(1);
 
 	string_tokens_free(tokens);
 	amtail_ast_free(ast);

@@ -6,6 +6,7 @@ typedef struct amtail_byteop {
 	uint8_t opcode;
 	string *export_name;
 	uint8_t vartype;
+	uint8_t facttype;
 	uint8_t hidden;
 	union {
 		double ld;
@@ -20,6 +21,9 @@ typedef struct amtail_byteop {
 
 	uint8_t by_count;
 	string **by;
+
+	uint8_t bucket_count;
+	string **bucket;
 
     //uint64_t jmp;
     regex_match *re_match;

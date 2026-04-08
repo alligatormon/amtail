@@ -35,6 +35,7 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
 	amtail_byteop *fill = &byte_code->ops[byte_code->l];
 	fill->opcode = ast->opcode;
 	fill->vartype = ast->vartype;
+	fill->facttype = ast->facttype;
 	fill->hidden = ast->hidden;
 	if (*ast->by)
 	{
@@ -46,10 +47,27 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
 		}
 	}
 
+	if (*ast->bucket)
+	{
+		fill->by_count = ast->by_count;
+		fill->by = calloc(1, sizeof(*fill->by) * ast->by_count);
+		for (uint64_t i = 0; i < ast->by_count; ++i)
+		{
+			fill->by[i] = string_init_alloc(ast->by[i]->s, ast->by[i]->l);
+		}
+	}
+
 	if (ast->vartype == ALLIGATOR_VARTYPE_CONST)
 	{
-		fill->ls = string_new();
-		string_string_copy(fill->ls, ast->svalue);
+		if (!strcmp(ast->name->s, "REST")) {
+			printf("DEBUG SET %s: %d\n", ast->name->s, ast->facttype);
+		}
+		if (ast->facttype == ALLIGATOR_FACTTYPE_INT)
+			fill->li = ast->ivalue;
+		else if (ast->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
+			fill->ld = ast->dvalue;
+		else if (ast->facttype == ALLIGATOR_FACTTYPE_TEXT)
+			fill->ls = string_string_init_dup(ast->svalue);
 	}
 
 	if (ast->export_name)
@@ -113,6 +131,7 @@ void amtail_bytecode_walk(amtail_bytecode *byte_code, amtail_ast *ast, amtail_lo
     uint64_t index = byte_code->l;
 	amtail_code_push(byte_code, ast, amtail_ll);
 
+	//printf("DEBUG: %llu: %p<>%p\n", index, ast->stem ? ast->stem[AMTAIL_AST_LEFT] : NULL, ast->stem ? ast->stem[AMTAIL_AST_RIGHT] : NULL);
 	if (ast->stem)
 	{
 		if (ast->stem[AMTAIL_AST_LEFT])
@@ -122,7 +141,7 @@ void amtail_bytecode_walk(amtail_bytecode *byte_code, amtail_ast *ast, amtail_lo
 		if (ast->stem[AMTAIL_AST_RIGHT])
         {
             //byte_code->ops[cur_ptr].jmp = byte_code->l + 1;
-            byte_code->ops[index].right_opcounter = byte_code->l;
+            byte_code->ops[index].right_opcounter = byte_code->l - 1;
             //printf("DEBUG2[%"PRIu64"]: %"PRIu64"\n", index, byte_code->ops[index].right_opcounter);
 			amtail_bytecode_walk(byte_code, ast->stem[AMTAIL_AST_RIGHT], amtail_ll);
         }

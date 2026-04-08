@@ -6,6 +6,8 @@
 #include "file.h"
 #include "variables.h"
 #include "vm.h"
+#include "lex.h"
+#include "parser.h"
 
 void run_tests(char *dir, char *file, string *logline)
 {
@@ -24,7 +26,7 @@ void run_tests_file(char *dir, char *file, char *log_filename)
 {
 	string *str = string_init_dup(dir);
 	amtail_log_level amtail_ll = {
-		.parser = 0,
+		.parser = 2,
 		.lexer = 0,
 		.generator = 0,
 		.compiler = 0,
@@ -46,7 +48,7 @@ void run_tests_file(char *dir, char *file, char *log_filename)
 	//string_tokens *logline = readlogfile(log_filename);
 
 	amtail_bytecode_dump(byte_code);
-	//exit(0);
+	exit(0);
 	amtail_run(byte_code, logline);
 
 	amtail_variables_dump(byte_code->variables);
@@ -57,27 +59,79 @@ void run_tests_file(char *dir, char *file, char *log_filename)
 	//string_tokens_free(logline);
 }
 
-int main()
+static int parser_test_file(const char *script_path, amtail_log_level amtail_ll)
 {
-	amtail_vm_init();
-	run_tests_file("tests/nginx.mtail", "nginx.mtail", "log/test2.log");
-	//string *logline = string_init_alloc("test 1", 6);
-	run_tests_file("tests/apache_combined.mtail", "apache_combined.mtail", "log/test2.log");
-	run_tests_file("tests/apache_common.mtail", "apache_common.mtail", "log/test2.log");
-	run_tests_file("tests/apache_metrics.mtail", "apache_metrics.mtail", "log/test2.log");
+	printf("[RUN] %s\n", script_path);
 
-	run_tests_file("tests/dhcpd.mtail", "dhcpd.mtail", "log/test2.log");
-	run_tests_file("tests/histogram.mtail", "histogram.mtail", "log/test2.log");
-	run_tests_file("tests/lighttpd.mtail", "lighttpd.mtail", "log/test2.log");
-	run_tests_file("tests/linecount.mtail", "linecount.mtail", "log/test2.log");
-	run_tests_file("tests/mysql_slowqueries.mtail", "mysql_slowqueries.mtail", "log/test2.log");
-	run_tests_file("tests/nocode.mtail", "nocode.mtail", "log/test2.log");
-	run_tests_file("tests/ntpd.mtail", "ntpd.mtail", "log/test2.log");
-	run_tests_file("tests/ntpd_peerstats.mtail", "ntpd_peerstats.mtail", "log/test2.log");
-	run_tests_file("tests/postfix.mtail", "postfix.mtail", "log/test2.log");
-	run_tests_file("tests/rails.mtail", "rails.mtail", "log/test2.log");
-	run_tests_file("tests/rsyncd.mtail", "rsyncd.mtail", "log/test2.log");
-	run_tests_file("tests/sftp.mtail", "sftp.mtail", "log/test2.log");
-	run_tests_file("tests/timer.mtail", "timer.mtail", "log/test2.log");
-	run_tests_file("tests/vsftpd.mtail", "vsftpd.mtail", "log/test2.log");
+	string *src = string_init_dup((char*)script_path);
+	string_tokens *tokens = amtail_lex(src, (char*)script_path, amtail_ll);
+	if (!tokens)
+	{
+		printf("[FAIL] lex: %s\n", script_path);
+		string_free(src);
+		return 1;
+	}
+
+	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
+	if (!ast)
+	{
+		printf("[FAIL] parser: %s\n", script_path);
+		string_tokens_free(tokens);
+		string_free(src);
+		return 1;
+	}
+
+	printf("[OK] %s\n", script_path);
+	/* TODO: replace with recursive AST destructor after parser stabilizes. */
+	/* amtail_ast_free(ast); */
+	string_tokens_free(tokens);
+	string_free(src);
+	return 0;
+}
+
+int main(int argc, char **argv)
+{
+	amtail_parser_init();
+	amtail_vm_init();
+
+	amtail_log_level amtail_ll = {
+		.parser = 0,
+		.lexer = 0,
+		.generator = 0,
+		.compiler = 0,
+	};
+
+	const char *scripts[] = {
+		"tests/apache_combined.mtail",
+		"tests/apache_common.mtail",
+		"tests/apache_metrics.mtail",
+		"tests/dhcpd.mtail",
+		"tests/histogram.mtail",
+		"tests/lighttpd.mtail",
+		"tests/linecount.mtail",
+		"tests/mysql_slowqueries.mtail",
+		"tests/nginx.mtail",
+		"tests/nocode.mtail",
+		"tests/ntpd.mtail",
+		"tests/ntpd_peerstats.mtail",
+		"tests/postfix.mtail",
+		"tests/postfix2.mtail",
+		"tests/postfix3.mtail",
+		"tests/rails.mtail",
+		"tests/rsyncd.mtail",
+		"tests/sftp.mtail",
+		"tests/timer.mtail",
+		"tests/vsftpd.mtail",
+	};
+
+	if (argc > 1)
+		return parser_test_file(argv[1], amtail_ll);
+
+	int failed = 0;
+	size_t script_count = sizeof(scripts) / sizeof(scripts[0]);
+	for (size_t i = 0; i < script_count; ++i)
+		failed += parser_test_file(scripts[i], amtail_ll);
+
+	printf("\nParser tests: %zu total, %d failed, %zu passed\n", script_count, failed, script_count - (size_t)failed);
+	return failed ? 1 : 0;
 }
