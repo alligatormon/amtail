@@ -5,8 +5,181 @@
 #include "dstructures/tommy.h"
 #include <string.h>
 #include <math.h>
+#include <ctype.h>
+#include <time.h>
 
 void (*amtail_vmfunc[256])(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline);
+void amtail_vmstack_push(amtail_thread *amt_thread, amtail_byteop *byte_ops);
+
+static void amtail_vm_free_tempop(amtail_byteop *op)
+{
+	if (!op || !op->allocated)
+		return;
+
+	if (op->vartype == ALLIGATOR_VARTYPE_TEXT && op->ls)
+		string_free(op->ls);
+	free(op);
+}
+
+static void amtail_vm_stack_clear(amtail_thread *amt_thread)
+{
+	if (!amt_thread)
+		return;
+
+	while (amt_thread->stack_ptr)
+	{
+		amtail_byteop *op = amt_thread->stack[--amt_thread->stack_ptr];
+		amtail_vm_free_tempop(op);
+	}
+}
+
+static amtail_byteop* amtail_vm_make_temp_value(amtail_thread *amt_thread)
+{
+	amtail_byteop *new = calloc(1, sizeof(*new));
+	if (!new)
+		return NULL;
+	new->allocated = 1;
+	amtail_vmstack_push(amt_thread, new);
+	return new;
+}
+
+static int amtail_vm_get_number(amtail_byteop *op, double *out)
+{
+	if (!op || !out)
+		return 0;
+
+	if (op->vartype == ALLIGATOR_VARTYPE_GAUGE)
+	{
+		*out = op->ld;
+		return 1;
+	}
+	if (op->vartype == ALLIGATOR_VARTYPE_COUNTER)
+	{
+		*out = (double)op->li;
+		return 1;
+	}
+
+	return 0;
+}
+
+static void amtail_vm_push_bool(amtail_thread *amt_thread, int value)
+{
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+
+	new->vartype = ALLIGATOR_VARTYPE_COUNTER;
+	new->li = value ? 1 : 0;
+}
+
+static char* amtail_vm_strdup_trim_quotes(const char *src)
+{
+	if (!src)
+		return NULL;
+
+	size_t len = strlen(src);
+	if (len >= 2 &&
+	    ((src[0] == '"' && src[len - 1] == '"') ||
+	     (src[0] == '\'' && src[len - 1] == '\'')))
+		return strndup(src + 1, len - 2);
+
+	return strdup(src);
+}
+
+static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables)
+{
+	if (!op)
+		return NULL;
+
+	if (op->vartype == ALLIGATOR_VARTYPE_TEXT && op->ls && op->ls->s)
+		return strdup(op->ls->s);
+	if (op->vartype == ALLIGATOR_VARTYPE_COUNTER)
+	{
+		char tmp[64];
+		snprintf(tmp, sizeof(tmp), "%"PRId64, op->li);
+		return strdup(tmp);
+	}
+	if (op->vartype == ALLIGATOR_VARTYPE_GAUGE)
+	{
+		char tmp[64];
+		snprintf(tmp, sizeof(tmp), "%.17g", op->ld);
+		return strdup(tmp);
+	}
+
+	if (op->export_name && op->export_name->s)
+	{
+		if (variables)
+		{
+			amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare,
+			                                           op->export_name->s,
+			                                           amtail_hash(op->export_name->s, op->export_name->l));
+			if (var)
+			{
+				if (var->type == ALLIGATOR_VARTYPE_TEXT && var->s && var->s->s)
+					return strdup(var->s->s);
+				if (var->type == ALLIGATOR_VARTYPE_CONST && var->facttype == ALLIGATOR_FACTTYPE_TEXT && var->s && var->s->s)
+					return strdup(var->s->s);
+				if (var->type == ALLIGATOR_VARTYPE_COUNTER)
+				{
+					char tmp[64];
+					snprintf(tmp, sizeof(tmp), "%"PRId64, var->i);
+					return strdup(tmp);
+				}
+				if (var->type == ALLIGATOR_VARTYPE_GAUGE)
+				{
+					char tmp[64];
+					snprintf(tmp, sizeof(tmp), "%.17g", var->d);
+					return strdup(tmp);
+				}
+			}
+		}
+
+		return amtail_vm_strdup_trim_quotes(op->export_name->s);
+	}
+
+	return NULL;
+}
+
+static void amtail_vm_push_text(amtail_thread *amt_thread, const char *text)
+{
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+
+	new->vartype = ALLIGATOR_VARTYPE_TEXT;
+	new->ls = string_init_dup((char*)(text ? text : ""));
+}
+
+static double amtail_vm_parse_epoch_string(const char *s)
+{
+	if (!s)
+		return 0;
+
+	char *end = NULL;
+	double v = strtod(s, &end);
+	if (end && *end == '\0')
+		return v;
+
+	/* Minimal fallback for "YYYY-MM-DD HH:MM:SS" / "YYYY-MM-DDTHH:MM:SS". */
+	int y = 0, mon = 0, d = 0, hh = 0, mm = 0, ss = 0;
+	if (sscanf(s, "%d-%d-%d %d:%d:%d", &y, &mon, &d, &hh, &mm, &ss) == 6 ||
+	    sscanf(s, "%d-%d-%dT%d:%d:%d", &y, &mon, &d, &hh, &mm, &ss) == 6)
+	{
+		struct tm tmv;
+		memset(&tmv, 0, sizeof(tmv));
+		tmv.tm_year = y - 1900;
+		tmv.tm_mon = mon - 1;
+		tmv.tm_mday = d;
+		tmv.tm_hour = hh;
+		tmv.tm_min = mm;
+		tmv.tm_sec = ss;
+		time_t t = mktime(&tmv);
+		if (t >= 0)
+			return (double)t;
+	}
+
+	return 0;
+}
 
 
 amtail_byteop* amtail_vmstack_pop(amtail_thread *amt_thread)
@@ -14,7 +187,6 @@ amtail_byteop* amtail_vmstack_pop(amtail_thread *amt_thread)
 	if (amt_thread->stack_ptr < 1)
 		return NULL;
 
-	printf("LOL %d: %p opcode %s {%"PRIu64" %lf}\n", amt_thread->stack_ptr-1, amt_thread->stack[amt_thread->stack_ptr-1], opname_from_code(amt_thread->stack[amt_thread->stack_ptr-1]->opcode), amt_thread->stack[amt_thread->stack_ptr-1]->li, amt_thread->stack[amt_thread->stack_ptr-1]->ld);
 	return amt_thread->stack[--amt_thread->stack_ptr];
 }
 
@@ -26,24 +198,70 @@ void amtail_vmstack_push(amtail_thread *amt_thread, amtail_byteop *byte_ops)
 		return;
 	}
 
-	printf("LUL %d: %p opcode %s {{%"PRIu64" %lf}\n", amt_thread->stack_ptr, byte_ops, opname_from_code(byte_ops->opcode), byte_ops->li, byte_ops->ld);
 	amt_thread->stack[amt_thread->stack_ptr++] = byte_ops;
 }
 
 void amtail_vmfunc_assign(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
 {
-	printf("ASSIGN! %p\n", byte_ops);
 	amtail_vmstack_push(amt_thread, byte_ops);
 }
 
 void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
 {
-	printf("VAR!\n");
-	amtail_vmstack_push(amt_thread, byte_ops);
+	if (!amt_thread || !byte_ops || !byte_ops->export_name || !byte_ops->export_name->s)
+		return;
+
+	amtail_byteop *resolved = amtail_vm_make_temp_value(amt_thread);
+	if (!resolved)
+		return;
+
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare,
+	                                           byte_ops->export_name->s,
+	                                           amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l));
+	if (var)
+	{
+		resolved->vartype = var->type;
+		if (var->type == ALLIGATOR_VARTYPE_COUNTER)
+			resolved->li = var->i;
+		else if (var->type == ALLIGATOR_VARTYPE_GAUGE)
+			resolved->ld = var->d;
+		else if (var->type == ALLIGATOR_VARTYPE_TEXT && var->s && var->s->s)
+			resolved->ls = string_string_init_dup(var->s);
+		else if (var->type == ALLIGATOR_VARTYPE_CONST)
+		{
+			resolved->facttype = var->facttype;
+			if (var->facttype == ALLIGATOR_FACTTYPE_INT)
+			{
+				resolved->vartype = ALLIGATOR_VARTYPE_COUNTER;
+				resolved->li = var->i;
+			}
+			else if (var->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
+			{
+				resolved->vartype = ALLIGATOR_VARTYPE_GAUGE;
+				resolved->ld = var->d;
+			}
+			else if (var->facttype == ALLIGATOR_FACTTYPE_TEXT && var->s && var->s->s)
+			{
+				resolved->vartype = ALLIGATOR_VARTYPE_TEXT;
+				resolved->ls = string_string_init_dup(var->s);
+			}
+		}
+		return;
+	}
+
+	/* Fallback for inline numeric literals emitted by parser. */
+	resolved->vartype = byte_ops->vartype;
+	if (byte_ops->vartype == ALLIGATOR_VARTYPE_COUNTER)
+		resolved->li = byte_ops->li;
+	else if (byte_ops->vartype == ALLIGATOR_VARTYPE_GAUGE)
+		resolved->ld = byte_ops->ld;
 }
 
 uint64_t amtail_vmfunc_branch(amtail_byteop *byte_ops, alligator_ht *variables, string *logline, uint64_t offset, uint64_t line_size)
 {
+	if (!byte_ops || !byte_ops->re_match || !logline || !logline->s)
+		return byte_ops ? byte_ops->right_opcounter : 0;
+
 	uint8_t match = amtail_regex_exec(byte_ops->re_match, logline->s+offset, line_size);
 	//fprintf(stderr, "branch pcre '%s' (jmp %"PRIu64", res: %"PRIu8" with logline '%p'\n", byte_ops->export_name->s+1, byte_ops->right_opcounter, match, logline->s);
 	if (match)
@@ -58,34 +276,64 @@ void amtail_vmfunc_add(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
-	amtail_byteop *new = calloc(1, sizeof(*new));
-	printf("ADD: left %p, right %p, new %p\n", left, right, new);
-	amtail_vmstack_push(amt_thread, new);
-	new->allocated = 1;
+	if (!left || !right)
+		return;
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
 
 	if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		new->li = left->li + right->li;
 		new->vartype = ALLIGATOR_VARTYPE_COUNTER;
-		printf("counter counter adding: %"PRId64" and %"PRId64"\n", left->li, right->li);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		new->ld = left->ld + right->li;
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("gauge counter adding: %lf and %"PRId64"\n", left->ld, right->li);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		new->ld = left->li + right->ld;
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("counter gauge adding: %"PRId64" and %lf\n", left->li, right->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		new->ld = left->ld + right->ld;
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("gauge gauge adding: %lf and %lf\n", left->ld, right->ld);
+	}
+}
+
+void amtail_vmfunc_sub(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
+	if (!left || !right)
+		return;
+
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+
+	if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
+	{
+		new->li = left->li - right->li;
+		new->vartype = ALLIGATOR_VARTYPE_COUNTER;
+	}
+	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
+	{
+		new->ld = left->ld - right->li;
+		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
+	}
+	else if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
+	{
+		new->ld = left->li - right->ld;
+		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
+	}
+	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
+	{
+		new->ld = left->ld - right->ld;
+		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
 	}
 }
 
@@ -94,34 +342,31 @@ void amtail_vmfunc_mul(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
-	amtail_byteop *new = calloc(1, sizeof(*new));
-	printf("MUL: left %p, right %p, new %p\n", left, right, new);
-	amtail_vmstack_push(amt_thread, new);
-	new->allocated = 1;
+	if (!left || !right)
+		return;
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
 
 	if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		new->li = left->li * right->li;
 		new->vartype = ALLIGATOR_VARTYPE_COUNTER;
-		printf("counter counter mul: %"PRId64" and %"PRId64" = %"PRIu64"\n", left->li, right->li, new->li);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		new->ld = left->ld * right->li;
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("gauge counter mul: %lf and %"PRId64" = %lf\n", left->ld, right->li, new->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		new->ld = left->li * right->ld;
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("counter gauge mul: %"PRId64" and %lf = %lf\n", left->li, right->ld, new->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		new->ld = left->ld * right->ld;
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("gauge gauge nul: %lf and %lf = %lf\n", left->ld, right->ld, new->ld);
 	}
 }
 
@@ -130,34 +375,31 @@ void amtail_vmfunc_pow(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
-	amtail_byteop *new = calloc(1, sizeof(*new));
-	printf("POW: left %p, right %p, new %p\n", left, right, new);
-	amtail_vmstack_push(amt_thread, new);
-	new->allocated = 1;
+	if (!left || !right)
+		return;
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
 
 	if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		new->li = pow(left->li, right->li);
 		new->vartype = ALLIGATOR_VARTYPE_COUNTER;
-		printf("counter counter pow: %"PRId64" and %"PRId64" = %"PRIu64"\n", left->li, right->li, new->li);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		new->ld = pow(left->ld, right->li);
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("gauge counter pow: %lf and %"PRId64" = %lf\n", left->ld, right->li, new->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		new->ld = pow(left->li, right->ld);
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("counter gauge pow: %"PRId64" and %lf = %lf\n", left->li, right->ld, new->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		new->ld = pow(left->ld, right->ld);
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("gauge gauge pow: %lf and %lf = %lf\n", left->ld, right->ld, new->ld);
 	}
 }
 
@@ -166,45 +408,295 @@ void amtail_vmfunc_div(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
-	amtail_byteop *new = calloc(1, sizeof(*new));
-	printf("DIV: left %p, right %p, new %p, opcode %u\n", left, right, new, right->opcode);
-	amtail_vmstack_push(amt_thread, new);
-	new->allocated = 1;
+	if (!left || !right)
+		return;
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
 
 	if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		new->li = left->li / right->li;
 		new->vartype = ALLIGATOR_VARTYPE_COUNTER;
-		printf("counter counter div: %"PRId64" and %"PRId64" = %"PRIu64"\n", left->li, right->li, new->li);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		new->ld = left->ld / right->li;
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("gauge counter div: %lf and %"PRId64" = %lf\n", left->ld, right->li, new->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_COUNTER && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		new->ld = left->li / right->ld;
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("counter gauge div: %"PRId64" and %lf = %lf\n", left->li, right->ld, new->ld);
 	}
 	else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE && right->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		new->ld = left->ld / right->ld;
 		new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-		printf("gauge gauge div: %lf and %lf = %lf\n", left->ld, right->ld, new->ld);
 	}
+}
+
+void amtail_vmfunc_mod(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
+	if (!left || !right)
+		return;
+
+	double l = 0, r = 0;
+	if (!amtail_vm_get_number(left, &l) || !amtail_vm_get_number(right, &r) || r == 0)
+		return;
+
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+	new->vartype = ALLIGATOR_VARTYPE_GAUGE;
+	new->ld = fmod(l, r);
+}
+
+void amtail_vmfunc_cmp_lt(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
+	double l = 0, r = 0;
+	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l < r);
+}
+
+void amtail_vmfunc_cmp_le(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
+	double l = 0, r = 0;
+	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l <= r);
+}
+
+void amtail_vmfunc_cmp_gt(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
+	double l = 0, r = 0;
+	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l > r);
+}
+
+void amtail_vmfunc_cmp_ge(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
+	double l = 0, r = 0;
+	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l >= r);
+}
+
+void amtail_vmfunc_cmp_eq(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
+	double l = 0, r = 0;
+	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l == r);
+}
+
+void amtail_vmfunc_cmp_ne(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
+	double l = 0, r = 0;
+	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l != r);
+}
+
+void amtail_vmfunc_logic_and(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
+	double l = 0, r = 0;
+	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l != 0 && r != 0);
+}
+
+void amtail_vmfunc_logic_or(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
+	double l = 0, r = 0;
+	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && (l != 0 || r != 0));
+}
+
+void amtail_vmfunc_logic_not(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	double v = 0;
+	amtail_vm_push_bool(amt_thread, !(val && amtail_vm_get_number(val, &v) && v != 0));
+}
+
+void amtail_vmfunc_match(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	if (!amt_thread || !byte_ops || !byte_ops->re_match || !amt_thread->line_ptr)
+	{
+		amtail_vm_push_bool(amt_thread, 0);
+		return;
+	}
+
+	amtail_vm_push_bool(amt_thread, amtail_regex_exec(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size) ? 1 : 0);
+}
+
+void amtail_vmfunc_notmatch(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	if (!amt_thread || !byte_ops || !byte_ops->re_match || !amt_thread->line_ptr)
+	{
+		amtail_vm_push_bool(amt_thread, 1);
+		return;
+	}
+
+	amtail_vm_push_bool(amt_thread, amtail_regex_exec(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size) ? 0 : 1);
+}
+
+void amtail_vmfunc_cast_int(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	if (!val)
+		return;
+	double v = 0;
+	if (!amtail_vm_get_number(val, &v))
+		return;
+
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+	new->vartype = ALLIGATOR_VARTYPE_COUNTER;
+	new->li = (int64_t)v;
+}
+
+void amtail_vmfunc_cast_float(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	if (!val)
+		return;
+	double v = 0;
+	if (!amtail_vm_get_number(val, &v))
+		return;
+
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+	new->vartype = ALLIGATOR_VARTYPE_GAUGE;
+	new->ld = v;
+}
+
+void amtail_vmfunc_cast_bool(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	if (!val)
+		return;
+	double v = 0;
+	if (!amtail_vm_get_number(val, &v))
+		return;
+
+	amtail_vm_push_bool(amt_thread, v != 0);
+}
+
+void amtail_vmfunc_fn_strtol(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	if (!val)
+		return;
+
+	char *s = amtail_vm_resolve_string(val, variables);
+	if (!s)
+		return;
+
+	char *end = NULL;
+	long long n = strtoll(s, &end, 10);
+	free(s);
+
+	if (!end)
+		return;
+
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+	new->vartype = ALLIGATOR_VARTYPE_COUNTER;
+	new->li = (int64_t)n;
+}
+
+void amtail_vmfunc_fn_len(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	if (!val)
+		return;
+
+	char *s = amtail_vm_resolve_string(val, variables);
+	if (!s)
+		return;
+
+	size_t l = strlen(s);
+	free(s);
+
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+	new->vartype = ALLIGATOR_VARTYPE_COUNTER;
+	new->li = (int64_t)l;
+}
+
+void amtail_vmfunc_fn_tolower(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	if (!val)
+		return;
+
+	char *s = amtail_vm_resolve_string(val, variables);
+	if (!s)
+		return;
+
+	for (char *p = s; *p; ++p)
+		*p = (char)tolower((unsigned char)*p);
+
+	amtail_vm_push_text(amt_thread, s);
+	free(s);
+}
+
+void amtail_vmfunc_fn_timestamp(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	struct timespec ts;
+	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
+		return;
+
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+	new->vartype = ALLIGATOR_VARTYPE_GAUGE;
+	new->ld = (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0);
+}
+
+void amtail_vmfunc_fn_strptime(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+{
+	/*
+	 * Parser does not yet preserve full call argument structure.
+	 * For now: parse top stack value as epoch-compatible string/number.
+	 */
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	if (!val)
+		return;
+
+	char *s = amtail_vm_resolve_string(val, variables);
+	if (!s)
+		return;
+	double epoch = amtail_vm_parse_epoch_string(s);
+	free(s);
+
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+	new->vartype = ALLIGATOR_VARTYPE_GAUGE;
+	new->ld = epoch;
 }
 
 void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
 {
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
-	amtail_byteop *new = calloc(1, sizeof(*new));
-	printf("RUN: left %p, right %p, new %p, find variable %s\n", left, right, new, right->export_name ? right->export_name->s : NULL);
-	amtail_vmstack_push(amt_thread, new);
-	new->allocated = 1;
+	if (!left || !right || !right->export_name || !right->export_name->s)
+		return;
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
 
 	uint32_t name_hash = amtail_hash(right->export_name->s, right->export_name->l);
 	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, right->export_name->s, name_hash);
@@ -283,7 +775,8 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 
 void amtail_vmfunc_inc(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
 {
-	printf("export name is %s\n", byte_ops->export_name->s);
+	if (!byte_ops || !byte_ops->export_name || !byte_ops->export_name->s)
+		return;
 	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, byte_ops->export_name->s, amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l));
 	if (var)
 	{
@@ -296,6 +789,8 @@ void amtail_vmfunc_inc(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 
 void amtail_vmfunc_dec(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
 {
+	if (!byte_ops || !byte_ops->export_name || !byte_ops->export_name->s)
+		return;
 	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, byte_ops->export_name->s, amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l));
 	if (var)
 	{
@@ -345,9 +840,40 @@ void amtail_vm_init()
 	amtail_vmfunc[AMTAIL_AST_OPCODE_INC] = amtail_vmfunc_inc;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_DEC] = amtail_vmfunc_dec;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_ADD] = amtail_vmfunc_add;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_SUB] = amtail_vmfunc_sub;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_MUL] = amtail_vmfunc_mul;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_POW] = amtail_vmfunc_pow;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_DIV] = amtail_vmfunc_div;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_MOD] = amtail_vmfunc_mod;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_LT] = amtail_vmfunc_cmp_lt;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_LE] = amtail_vmfunc_cmp_le;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_GT] = amtail_vmfunc_cmp_gt;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_GE] = amtail_vmfunc_cmp_ge;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_EQ] = amtail_vmfunc_cmp_eq;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_NE] = amtail_vmfunc_cmp_ne;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_AND] = amtail_vmfunc_logic_and;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_OR] = amtail_vmfunc_logic_or;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_NOT] = amtail_vmfunc_logic_not;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_MATCH] = amtail_vmfunc_match;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_NOTMATCH] = amtail_vmfunc_notmatch;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_DECLARATION] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_CALL] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_STOP] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_MATCH] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_CMP] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_JMP] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_STRPTIME] = amtail_vmfunc_fn_strptime;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_TIMESTAMP] = amtail_vmfunc_fn_timestamp;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_TOLOWER] = amtail_vmfunc_fn_tolower;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_LEN] = amtail_vmfunc_fn_len;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_STRTOL] = amtail_vmfunc_fn_strtol;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_SETTIME] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_GETFILENAME] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_INT] = amtail_vmfunc_cast_int;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_BOOL] = amtail_vmfunc_cast_bool;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_FLOAT] = amtail_vmfunc_cast_float;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_STRING] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_SUBST] = amtail_vmfunc_noop;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_ASSIGN] = amtail_vmfunc_assign;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_VAR] = amtail_vmfunc_var_use;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_RUN] = amtail_vmfunc_runcalc;
@@ -394,18 +920,48 @@ uint64_t amtail_branch_select(amtail_byteop *byte_ops, alligator_ht *variables, 
 
 int amtail_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
 {
-	if (
-		(byte_ops->opcode == AMTAIL_AST_OPCODE_BRANCH) ||
-		(byte_ops->opcode == AMTAIL_AST_OPCODE_VARIABLE)
-	)
+	if (byte_ops->opcode == AMTAIL_AST_OPCODE_BRANCH)
 		return 2;
+	else if (byte_ops->opcode == AMTAIL_AST_OPCODE_VARIABLE)
+		return 1;
 	else if (
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_INC) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_DEC) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_ADD) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_SUB) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_MUL) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_POW) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_DIV) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_MOD) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_LT) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_LE) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_GT) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_GE) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_EQ) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_NE) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_AND) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_OR) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_NOT) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_MATCH) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_NOTMATCH) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_DECLARATION) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_CALL) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_STOP) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_MATCH) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_CMP) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_JMP) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_STRPTIME) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_TIMESTAMP) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_TOLOWER) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_LEN) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_STRTOL) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_SETTIME) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_GETFILENAME) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_INT) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_BOOL) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_FLOAT) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_STRING) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_SUBST) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_ASSIGN) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_VAR) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_RUN) ||
@@ -480,19 +1036,18 @@ int amtail_run(amtail_bytecode* byte_code, string* logline)
 		amtail_pre_execute(amt_thread, &byte_ops[i], variables, logline);
 	}
 
-	for (uint64_t cursym_log = 0, counter = 0; cursym_log < logline->l; ++cursym_log, ++counter)
+	for (uint64_t cursym_log = 0; cursym_log < logline->l; )
 	{
-		//printf("logline counter %llu\n", counter);
 		line_size = strcspn(logline->s + cursym_log, "\n");
-		while (amtail_vmstack_pop(amt_thread));
+		amt_thread->line_ptr = logline->s + cursym_log;
+		amt_thread->line_size = line_size;
+		amtail_vm_stack_clear(amt_thread);
 		for (uint64_t i = 0; i < size; ++i)
 		{
 			rc = amtail_execute(amt_thread, &byte_ops[i], variables, logline);
-			printf("amtail_execute [%llu] returned %d\n", (unsigned long long)i, rc);
 			if (rc == 2) // branch
 			{
 				uint64_t new = amtail_branch_select(&byte_ops[i], variables, logline, cursym_log, line_size);
-				//printf("new branch select: %llu\n", new);
 				if (new)
 					i = new;
 			}
@@ -507,6 +1062,7 @@ int amtail_run(amtail_bytecode* byte_code, string* logline)
 		cursym_log += strspn(logline->s + cursym_log, "\n");
 	}
 
+	amtail_vm_stack_clear(amt_thread);
 	amtail_thread_free(amt_thread);
 	return 1;
 }

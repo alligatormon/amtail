@@ -295,7 +295,7 @@ void strmbtok_amtail_lexer(char *inp, string_tokens *st, char *openblock, char *
 			printf("\tTOK: '%s'\n", ltoken);
 
 		amtail_ll.lexer = amtail_lexer_log;
-		while ((token = strmbtok(start, word, &word, &sz, " \t\n,", openblock, closeblock, &is_expression, &is_bracket, &is_squarebracket, amtail_ll)))
+		while ((token = strmbtok(start, word, &word, &sz, " \t\n,;", openblock, closeblock, &is_expression, &is_bracket, &is_squarebracket, amtail_ll)))
 		{
 			// skip comment
 			if (!strncmp(token, "#", 1))

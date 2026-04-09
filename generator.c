@@ -54,34 +54,54 @@ static void compile_regex_for_op(amtail_byteop *op, amtail_log_level amtail_ll)
 	if (!op || !op->export_name || !op->export_name->s || !op->export_name->l)
 		return;
 
-	if (op->opcode != AMTAIL_AST_OPCODE_BRANCH)
+	if (op->opcode != AMTAIL_AST_OPCODE_BRANCH &&
+	    op->opcode != AMTAIL_AST_OPCODE_MATCH &&
+	    op->opcode != AMTAIL_AST_OPCODE_NOTMATCH)
 		return;
 
-	char *pattern = op->export_name->s;
-	size_t pattern_len = op->export_name->l;
+	char *pattern = NULL;
+	size_t pattern_len = 0;
 
-	/* Branch op is also used for non-regex conditions in current parser. */
-	if (!(strstr(pattern, "(?P<") || strchr(pattern, '\\') || strchr(pattern, '[') ||
-	      strchr(pattern, '^') || strstr(pattern, ".*") || strchr(pattern, '$')))
-		return;
+	if (op->opcode == AMTAIL_AST_OPCODE_MATCH || op->opcode == AMTAIL_AST_OPCODE_NOTMATCH)
+	{
+		char *first = strchr(op->export_name->s, '/');
+		char *last = strrchr(op->export_name->s, '/');
+		if (!first || !last || first == last)
+			return;
+
+		pattern = first + 1;
+		pattern_len = (size_t)(last - first - 1);
+	}
+	else
+	{
+		pattern = op->export_name->s;
+		pattern_len = op->export_name->l;
+	}
 
 	/*
-	 * Parser currently uses BRANCH for both pure regex and condition forms
+	 * Parser uses BRANCH for pure /.../ blocks and for condition forms
 	 * like "$message /.../". The latter are not standalone regex patterns.
 	 */
-	if (pattern[0] == '$' || strstr(pattern, " /") || strstr(pattern, " $"))
+	if (op->opcode == AMTAIL_AST_OPCODE_BRANCH &&
+	    (pattern[0] == '$' || strstr(pattern, " /") || strstr(pattern, " $")))
 		return;
 
 	/* Keep parser output intact; trim only canonical /.../ wrapper if present. */
-	if (pattern_len >= 2 && pattern[0] == '/' && pattern[pattern_len - 1] == '/')
+	if (op->opcode == AMTAIL_AST_OPCODE_BRANCH &&
+	    pattern_len >= 2 && pattern[0] == '/' && pattern[pattern_len - 1] == '/')
 	{
-		pattern[pattern_len - 1] = 0;
 		++pattern;
+		pattern_len -= 2;
 	}
 
-	op->re_match = amtail_regex_compile(pattern);
+	char *compiled_pattern = strndup(pattern, pattern_len);
+	if (!compiled_pattern)
+		return;
+
+	op->re_match = amtail_regex_compile(compiled_pattern);
 	if (amtail_ll.generator > 0)
-		printf("compile regexp for opcode %u: %p: '%s'\n", op->opcode, op->re_match, pattern);
+		printf("compile regexp for opcode %u: %p: '%s'\n", op->opcode, op->re_match, compiled_pattern);
+	free(compiled_pattern);
 }
 
 typedef struct ast_walk_ctx {
