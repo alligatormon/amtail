@@ -36,6 +36,7 @@ typedef struct amtail_bytecode {
 	uint64_t m;
 	uint64_t l;
 	alligator_ht *variables;
+	uint8_t prepared;
 } amtail_bytecode;
 
 amtail_bytecode* amtail_code_generator(amtail_ast *ast, amtail_log_level amtail_ll);

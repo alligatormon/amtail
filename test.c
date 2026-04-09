@@ -67,8 +67,8 @@ void run_tests_file(char *dir, char *file, char *log_filename)
 
 static int run_mtail_script_with_log(const char *script_path, const char *log_path)
 {
-	struct file *log_file = readfile((char*)log_path);
-	if (!log_file || !log_file->mem)
+	FILE *logf = fopen(log_path, "r");
+	if (!logf)
 	{
 		printf("[FAIL][RUN] cannot read log: %s\n", log_path);
 		return 1;
@@ -82,14 +82,12 @@ static int run_mtail_script_with_log(const char *script_path, const char *log_pa
 	};
 
 	string *script = string_init_dup((char*)script_path);
-	string *logline = string_init_dup(log_file->mem);
 	string_tokens *tokens = amtail_lex(script, (char*)script_path, amtail_ll);
 	if (!tokens)
 	{
 		printf("[FAIL][RUN] lex failed: %s\n", script_path);
 		string_free(script);
-		string_free(logline);
-		releasefile(log_file);
+		fclose(logf);
 		return 1;
 	}
 	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
@@ -98,8 +96,7 @@ static int run_mtail_script_with_log(const char *script_path, const char *log_pa
 		printf("[FAIL][RUN] parser failed: %s\n", script_path);
 		string_tokens_free(tokens);
 		string_free(script);
-		string_free(logline);
-		releasefile(log_file);
+		fclose(logf);
 		return 1;
 	}
 	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
@@ -109,12 +106,28 @@ static int run_mtail_script_with_log(const char *script_path, const char *log_pa
 		amtail_ast_free(ast);
 		string_tokens_free(tokens);
 		string_free(script);
-		string_free(logline);
-		releasefile(log_file);
+		fclose(logf);
 		return 1;
 	}
 
-	int rc = amtail_run(byte_code, logline);
+	int rc = 1;
+	char *linebuf = NULL;
+	size_t linecap = 0;
+	ssize_t linelen = 0;
+	while ((linelen = getline(&linebuf, &linecap, logf)) != -1)
+	{
+		string *line = string_init_alloc(linebuf, (uint64_t)linelen);
+		int line_rc = amtail_run(byte_code, line);
+		string_free(line);
+		if (!line_rc)
+		{
+			rc = 0;
+			break;
+		}
+	}
+	free(linebuf);
+	fclose(logf);
+
 	printf("[RUN] script=%s log=%s rc=%d\n", script_path, log_path, rc);
 	amtail_variables_dump(byte_code->variables);
 
@@ -122,8 +135,6 @@ static int run_mtail_script_with_log(const char *script_path, const char *log_pa
 	amtail_ast_free(ast);
 	string_tokens_free(tokens);
 	string_free(script);
-	string_free(logline);
-	releasefile(log_file);
 	return rc ? 0 : 1;
 }
 

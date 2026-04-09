@@ -1031,9 +1031,13 @@ int amtail_run(amtail_bytecode* byte_code, string* logline)
 
 	amtail_thread *amt_thread = amtail_thread_init();
 
-	for (uint64_t i = 0; i < size; ++i)
+	if (!byte_code->prepared)
 	{
-		amtail_pre_execute(amt_thread, &byte_ops[i], variables, logline);
+		for (uint64_t i = 0; i < size; ++i)
+		{
+			amtail_pre_execute(amt_thread, &byte_ops[i], variables, logline);
+		}
+		byte_code->prepared = 1;
 	}
 
 	for (uint64_t cursym_log = 0; cursym_log < logline->l; )
