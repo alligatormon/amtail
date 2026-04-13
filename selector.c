@@ -180,14 +180,8 @@ void string_new_size(string *str, size_t len)
 		return;
 	}
 	uint64_t newsize = str->m*2+len;
-	//printf("alloc %zu, copy %zu, str->m %zu, str->m*2 %zu, str->m*2+len %zu, len %zu\n", newsize, str->l+1, str->m, str->m*2, str->m*2+len, len);
-	char *newstr_char = malloc(newsize);
-	memcpy(newstr_char, str->s, str->l+1);
-	char *oldstr_char = str->s;
-	str->s = newstr_char;
+	str->s = realloc(str->s, newsize);
 	str->m = newsize;
-
-	free(oldstr_char);
 }
 
 void string_null(string *str)
@@ -253,7 +247,8 @@ void string_cat(string *str, char *strcat, size_t len)
 	if(str_len+len >= str->m)
 		string_new_size(str, len);
 
-	size_t copy_size = len < (str->m - str_len) ? len : str_len;
+	size_t free_space = str->m > str_len ? str->m - str_len - 1 : 0;
+	size_t copy_size = len < free_space ? len : free_space;
 	//printf("+++++ string cat (%zu) +++++++\n%s\n", len, strcat);
 	//printf("string '%s'\nstr_len=%zu\nstrcat='%s'\ncopy_size=%zu\nlen=%zu\n", str->s, str_len, strcat, copy_size+1, len);
 	memcpy(str->s+str_len, strcat, copy_size);
@@ -305,7 +300,8 @@ void string_uint(string *str, uint64_t u)
 	snprintf(num, 20, "%"u64, u);
 
 	size_t len = strlen(num);
-	size_t copy_size = len < (str->m - str_len) ? len : str_len;
+	size_t free_space = str->m > str_len ? str->m - str_len - 1 : 0;
+	size_t copy_size = len < free_space ? len : free_space;
 	strlcpy(str->s+str_len, num, copy_size+1);
 	str->l += copy_size;
 }
@@ -320,7 +316,8 @@ void string_int(string *str, int64_t i)
 	snprintf(num, 20, "%"d64, i);
 
 	size_t len = strlen(num);
-	size_t copy_size = len < (str->m - str_len) ? len : str_len;
+	size_t free_space = str->m > str_len ? str->m - str_len - 1 : 0;
+	size_t copy_size = len < free_space ? len : free_space;
 	strlcpy(str->s+str_len, num, copy_size+1);
 	str->l += copy_size;
 }
@@ -335,7 +332,8 @@ void string_double(string *str, double d)
 	snprintf(num, 20, "%lf", d);
 
 	size_t len = strlen(num);
-	size_t copy_size = len < (str->m - str_len) ? len : str_len;
+	size_t free_space = str->m > str_len ? str->m - str_len - 1 : 0;
+	size_t copy_size = len < free_space ? len : free_space;
 	strlcpy(str->s+str_len, num, copy_size+1);
 	str->l += copy_size;
 }
@@ -381,11 +379,15 @@ void string_cut(string *str, uint64_t offset, size_t len)
 	if (!str->l)
 		return;
 
-	memcpy(str->s + offset, str->s + offset + len, str->l - len - offset);
+	if (offset >= str->l)
+		return;
+
+	if (offset + len > str->l)
+		len = str->l - offset;
+
+	memmove(str->s + offset, str->s + offset + len, str->l - len - offset);
 	str->l -= len;
 	str->s[str->l] = 0;
-	printf("'%s'\n", str->s + offset);
-	puts("================================");
 }
 
 void string_vprintf(string *str, const char *fmt, va_list ap)
@@ -426,14 +428,24 @@ void string_sprintf(string *str, const char *fmt, ...)
 
 void string_break(string *str, uint64_t start, uint64_t end)
 {
-	uint64_t newend = end - start;
-	//printf("1start is %"u64", end is %"u64", newend is %"u64", l is %zu, m is %zu\n", start, end, newend, str->l, str->m);
-	if (!end)
-		newend = str->l - start;
-	//printf("2start is %"u64", end is %"u64", newend is %"u64", l is %zu, m is %zu\n", start, end, newend, str->l, str->m);
+	if (!str || !str->s)
+		return;
 
-	if (start)
-		memcpy(str->s, str->s + start, newend);
+	if (start >= str->l) {
+		str->l = 0;
+		str->s[0] = 0;
+		return;
+	}
+
+	size_t stop = end ? (size_t)end : str->l;
+	if (stop > str->l)
+		stop = str->l;
+	if (stop < start)
+		stop = (size_t)start;
+
+	size_t newend = stop - (size_t)start;
+	if (start && newend)
+		memmove(str->s, str->s + start, newend);
 	str->l = newend;
 	str->s[str->l] = 0;
 }
