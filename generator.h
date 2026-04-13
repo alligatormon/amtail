@@ -1,6 +1,7 @@
 #pragma once
 #include "parser.h"
 #include "common/pcre_parser.h"
+#include "common/selector.h"
 
 typedef struct amtail_byteop {
 	uint8_t opcode;

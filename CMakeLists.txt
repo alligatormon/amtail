@@ -48,22 +48,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 link_directories(/usr/local/lib/)
 
-#set(STATIC_FILES
-#    generator.c
-#    file.c
-#    selector.c
-#    ../../src/dstructures/tommy.c
-#    ../../src/dstructures/tommyds/tommyds/tommyhash.c
-#    ../../src/dstructures/tommyds/tommyds/tommyhashdyn.c
-#    ../../src/dstructures/ht.c
-#    compile.c
-#    lex.c
-#    parser.c
-#    vm.c
-#    variables.c
-#)
-#add_library(${COMMON} STATIC ${STATIC_FILES} ${RPM_FILES})
-add_executable(${HEAD} test.c
+set(AMTAIL_CORE_SOURCES
     generator.c
     file.c
     selector.c
@@ -79,6 +64,17 @@ add_executable(${HEAD} test.c
     amtail_pcre.c
 )
 
+add_library(${HEAD}_static STATIC ${AMTAIL_CORE_SOURCES})
+set_target_properties(${HEAD}_static PROPERTIES
+    C_STANDARD 11
+    OUTPUT_NAME ${HEAD}
+)
+target_include_directories(${HEAD}_static PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ../alligator/src
+)
+
+add_executable(${HEAD} test.c)
 set_target_properties(${HEAD} PROPERTIES C_STANDARD 11)
 
 find_library(PCRE_LIB NAMES pcre HINTS /usr/lib64 /usr/lib /usr/local/lib)
@@ -94,7 +90,11 @@ if(UNIX AND NOT APPLE)
     endif()
 endif()
 
-target_link_libraries(${HEAD} ${COMMON} ${PCRE_LIB} pthread m ${EXTRA_PLATFORM_LIBS})
+target_link_libraries(${HEAD} ${HEAD}_static ${PCRE_LIB} pthread m ${EXTRA_PLATFORM_LIBS})
+
+install(TARGETS ${HEAD}_static
+    ARCHIVE DESTINATION lib
+)
 
 set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
