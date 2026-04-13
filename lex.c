@@ -18,11 +18,11 @@ char* lexdebugprint(char *debugbuffer, size_t debugsize, char *token, size_t siz
 	uint64_t j;
 	for (i = 0, j = 0; i < size; ++i, ++j) {
 		if (token[j] == '\n') {
-			if (int_min(debugsize, size) == size) {
+			if (uint_min(debugsize, size) == size) {
 				int ret = strlcpy(debugbuffer+i, " %NEXTLINE%:", size);
 				i += ret - 1;
 				size += ret - 1;
-				size = int_min(debugsize, size);
+				size = uint_min(debugsize, size);
 				debugsize -= ret - 1;
 			}
 		} else if (isprint(token[j])) {

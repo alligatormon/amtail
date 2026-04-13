@@ -14,4 +14,4 @@ void string_tokens_free(string_tokens *st);
 void string_string_copy(string *dst, string *src);
 string* string_string_init_dup(string *str);
 
-uint64_t int_min(uint64_t a, uint64_t b);
+uint64_t uint_min(uint64_t a, uint64_t b);

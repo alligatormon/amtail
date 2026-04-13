@@ -498,7 +498,7 @@ void string_tokens_print(string_tokens *st)
     }
 }
 
-uint64_t int_min(uint64_t a, uint64_t b) {
+uint64_t uint_min(uint64_t a, uint64_t b) {
     return a > b ? b : a;
 }
 
