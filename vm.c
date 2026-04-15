@@ -1,5 +1,6 @@
 #include "common/selector.h"
 #include "generator.h"
+#include "amtail_pcre.h"
 #include "vm.h"
 #include "variables.h"
 #include "dstructures/tommy.h"
