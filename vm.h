@@ -10,5 +10,5 @@ typedef struct amtail_thread {
 } amtail_thread;
 
 void amtail_bytecode_dump(amtail_bytecode* byte_code);
-int amtail_run(amtail_bytecode* byte_code, string* logline);
+int amtail_run(amtail_bytecode* byte_code, string* logline, amtail_log_level amtail_ll);
 void amtail_vm_init();

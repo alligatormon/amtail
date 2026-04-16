@@ -22,7 +22,7 @@ void run_tests(char *dir, char *file, string *logline)
 		.compiler = 0,
 	};
 	amtail_bytecode* byte_code = amtail_compile(file, str, amtail_ll);
-	amtail_run(byte_code, logline);
+	amtail_run(byte_code, logline, amtail_ll);
 	amtail_code_free(byte_code);
 }
 
@@ -53,7 +53,7 @@ void run_tests_file(char *dir, char *file, char *log_filename)
 	//string_tokens *logline = readlogfile(log_filename);
 
 	amtail_bytecode_dump(byte_code);
-	amtail_run(byte_code, logline);
+	amtail_run(byte_code, logline, amtail_ll);
 
 	amtail_variables_dump(byte_code->variables);
 
@@ -117,7 +117,7 @@ static int run_mtail_script_with_log(const char *script_path, const char *log_pa
 	while ((linelen = getline(&linebuf, &linecap, logf)) != -1)
 	{
 		string *line = string_init_alloc(linebuf, (uint64_t)linelen);
-		int line_rc = amtail_run(byte_code, line);
+		int line_rc = amtail_run(byte_code, line, amtail_ll);
 		string_free(line);
 		if (!line_rc)
 		{
@@ -430,6 +430,7 @@ static int runtime_expect_gauge_positive(alligator_ht *variables, const char *na
 
 static int vm_runtime_test_timestamp(void)
 {
+	amtail_log_level amtail_ll = {0};
 	amtail_bytecode *bc = runtime_bc_new(4);
 	bc->ops[0].opcode = AMTAIL_AST_OPCODE_VARIABLE;
 	bc->ops[0].vartype = ALLIGATOR_VARTYPE_GAUGE;
@@ -439,7 +440,7 @@ static int vm_runtime_test_timestamp(void)
 	bc->ops[2].opcode = AMTAIL_AST_OPCODE_FUNC_TIMESTAMP;
 	bc->ops[3].opcode = AMTAIL_AST_OPCODE_RUN;
 	string *line = string_init_dup("x\n");
-	int rc = amtail_run(bc, line);
+	int rc = amtail_run(bc, line, amtail_ll);
 	int ok = rc && runtime_expect_gauge_positive(bc->variables, "ts");
 	string_free(line);
 	runtime_bc_free(bc);
@@ -448,6 +449,7 @@ static int vm_runtime_test_timestamp(void)
 
 static int vm_runtime_test_len_strtol(void)
 {
+	amtail_log_level amtail_ll = {0};
 	int ok = 1;
 
 	/* len("Hello") -> 5 */
@@ -464,7 +466,7 @@ static int vm_runtime_test_len_strtol(void)
 		bc->ops[4].opcode = AMTAIL_AST_OPCODE_RUN;
 		runtime_insert_text(bc->variables, "msg", "Hello");
 		string *line = string_init_dup("x\n");
-		ok = ok && amtail_run(bc, line) && runtime_expect_counter(bc->variables, "lenv", 5);
+		ok = ok && amtail_run(bc, line, amtail_ll) && runtime_expect_counter(bc->variables, "lenv", 5);
 		string_free(line);
 		runtime_bc_free(bc);
 	}
@@ -483,7 +485,7 @@ static int vm_runtime_test_len_strtol(void)
 		bc->ops[4].opcode = AMTAIL_AST_OPCODE_RUN;
 		runtime_insert_text(bc->variables, "numtxt", "42");
 		string *line = string_init_dup("x\n");
-		ok = ok && amtail_run(bc, line) && runtime_expect_counter(bc->variables, "ival", 42);
+		ok = ok && amtail_run(bc, line, amtail_ll) && runtime_expect_counter(bc->variables, "ival", 42);
 		string_free(line);
 		runtime_bc_free(bc);
 	}
@@ -493,6 +495,7 @@ static int vm_runtime_test_len_strtol(void)
 
 static int vm_runtime_test_strptime_and_match(void)
 {
+	amtail_log_level amtail_ll = {0};
 	int ok = 1;
 
 	/* strptime("2024-01-02 03:04:05") -> epoch > 0 */
@@ -509,7 +512,7 @@ static int vm_runtime_test_strptime_and_match(void)
 		bc->ops[4].opcode = AMTAIL_AST_OPCODE_RUN;
 		runtime_insert_text(bc->variables, "datestr", "2024-01-02 03:04:05");
 		string *line = string_init_dup("x\n");
-		ok = ok && amtail_run(bc, line) && runtime_expect_gauge_positive(bc->variables, "parsed");
+		ok = ok && amtail_run(bc, line, amtail_ll) && runtime_expect_gauge_positive(bc->variables, "parsed");
 		string_free(line);
 		runtime_bc_free(bc);
 	}
@@ -537,7 +540,7 @@ static int vm_runtime_test_strptime_and_match(void)
 		bc->ops[7].opcode = AMTAIL_AST_OPCODE_RUN;
 		bc->ops[8].opcode = AMTAIL_AST_OPCODE_NOOP;
 		string *line = string_init_dup("foo baz\n");
-		ok = ok && amtail_run(bc, line) &&
+		ok = ok && amtail_run(bc, line, amtail_ll) &&
 		     runtime_expect_counter(bc->variables, "m", 1) &&
 		     runtime_expect_counter(bc->variables, "nm", 1);
 		string_free(line);

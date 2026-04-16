@@ -78,12 +78,13 @@ uint8_t amtail_regex_exec(regex_match *rematch, char *regex_match_string, uint64
 
     //printf("\nOK, has matched ...\n\n");
 
-    uint8_t i;
-    for (i = 1; i < count; i++) {
-            char *substring_start = regex_match_string + ovector[2*i];
-            int substring_length = ovector[2*i+1] - ovector[2*i];
-            printf("%2d: %.*s\n", i, substring_length, substring_start);
-    }
+	// trace
+    //uint8_t i;
+    //for (i = 1; i < count; i++) {
+    //        char *substring_start = regex_match_string + ovector[2*i];
+    //        int substring_length = ovector[2*i+1] - ovector[2*i];
+    //        printf("%2d: %.*s\n", i, substring_length, substring_start);
+    //}
 
     return count;
 }

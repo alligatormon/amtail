@@ -9,7 +9,7 @@
 #include <ctype.h>
 #include <time.h>
 
-void (*amtail_vmfunc[256])(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline);
+void (*amtail_vmfunc[256])(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll);
 void amtail_vmstack_push(amtail_thread *amt_thread, amtail_byteop *byte_ops);
 
 static void amtail_vm_free_tempop(amtail_byteop *op)
@@ -202,12 +202,12 @@ void amtail_vmstack_push(amtail_thread *amt_thread, amtail_byteop *byte_ops)
 	amt_thread->stack[amt_thread->stack_ptr++] = byte_ops;
 }
 
-void amtail_vmfunc_assign(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_assign(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_vmstack_push(amt_thread, byte_ops);
 }
 
-void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	if (!amt_thread || !byte_ops || !byte_ops->export_name || !byte_ops->export_name->s)
 		return;
@@ -273,7 +273,7 @@ uint64_t amtail_vmfunc_branch(amtail_byteop *byte_ops, alligator_ht *variables, 
 }
 
 // TODO
-void amtail_vmfunc_add(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_add(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -305,7 +305,7 @@ void amtail_vmfunc_add(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	}
 }
 
-void amtail_vmfunc_sub(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_sub(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -338,7 +338,7 @@ void amtail_vmfunc_sub(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	}
 }
 
-void amtail_vmfunc_mul(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_mul(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
@@ -371,7 +371,7 @@ void amtail_vmfunc_mul(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	}
 }
 
-void amtail_vmfunc_pow(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_pow(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
@@ -404,7 +404,7 @@ void amtail_vmfunc_pow(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	}
 }
 
-void amtail_vmfunc_div(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_div(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
@@ -437,7 +437,7 @@ void amtail_vmfunc_div(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	}
 }
 
-void amtail_vmfunc_mod(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_mod(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -455,7 +455,7 @@ void amtail_vmfunc_mod(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	new->ld = fmod(l, r);
 }
 
-void amtail_vmfunc_cmp_lt(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_cmp_lt(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -463,7 +463,7 @@ void amtail_vmfunc_cmp_lt(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l < r);
 }
 
-void amtail_vmfunc_cmp_le(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_cmp_le(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -471,7 +471,7 @@ void amtail_vmfunc_cmp_le(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l <= r);
 }
 
-void amtail_vmfunc_cmp_gt(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_cmp_gt(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -479,7 +479,7 @@ void amtail_vmfunc_cmp_gt(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l > r);
 }
 
-void amtail_vmfunc_cmp_ge(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_cmp_ge(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -487,7 +487,7 @@ void amtail_vmfunc_cmp_ge(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l >= r);
 }
 
-void amtail_vmfunc_cmp_eq(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_cmp_eq(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -495,7 +495,7 @@ void amtail_vmfunc_cmp_eq(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l == r);
 }
 
-void amtail_vmfunc_cmp_ne(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_cmp_ne(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -503,7 +503,7 @@ void amtail_vmfunc_cmp_ne(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l != r);
 }
 
-void amtail_vmfunc_logic_and(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_logic_and(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -511,7 +511,7 @@ void amtail_vmfunc_logic_and(amtail_thread *amt_thread, amtail_byteop *byte_ops,
 	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l != 0 && r != 0);
 }
 
-void amtail_vmfunc_logic_or(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_logic_or(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
@@ -519,14 +519,14 @@ void amtail_vmfunc_logic_or(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && (l != 0 || r != 0));
 }
 
-void amtail_vmfunc_logic_not(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_logic_not(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
 	double v = 0;
 	amtail_vm_push_bool(amt_thread, !(val && amtail_vm_get_number(val, &v) && v != 0));
 }
 
-void amtail_vmfunc_match(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_match(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	if (!amt_thread || !byte_ops || !byte_ops->re_match || !amt_thread->line_ptr)
 	{
@@ -537,7 +537,7 @@ void amtail_vmfunc_match(amtail_thread *amt_thread, amtail_byteop *byte_ops, all
 	amtail_vm_push_bool(amt_thread, amtail_regex_exec(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size) ? 1 : 0);
 }
 
-void amtail_vmfunc_notmatch(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_notmatch(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	if (!amt_thread || !byte_ops || !byte_ops->re_match || !amt_thread->line_ptr)
 	{
@@ -548,7 +548,7 @@ void amtail_vmfunc_notmatch(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 	amtail_vm_push_bool(amt_thread, amtail_regex_exec(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size) ? 0 : 1);
 }
 
-void amtail_vmfunc_cast_int(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_cast_int(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
 	if (!val)
@@ -564,7 +564,7 @@ void amtail_vmfunc_cast_int(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 	new->li = (int64_t)v;
 }
 
-void amtail_vmfunc_cast_float(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_cast_float(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
 	if (!val)
@@ -580,7 +580,7 @@ void amtail_vmfunc_cast_float(amtail_thread *amt_thread, amtail_byteop *byte_ops
 	new->ld = v;
 }
 
-void amtail_vmfunc_cast_bool(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_cast_bool(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
 	if (!val)
@@ -592,7 +592,7 @@ void amtail_vmfunc_cast_bool(amtail_thread *amt_thread, amtail_byteop *byte_ops,
 	amtail_vm_push_bool(amt_thread, v != 0);
 }
 
-void amtail_vmfunc_fn_strtol(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_fn_strtol(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
 	if (!val)
@@ -616,7 +616,7 @@ void amtail_vmfunc_fn_strtol(amtail_thread *amt_thread, amtail_byteop *byte_ops,
 	new->li = (int64_t)n;
 }
 
-void amtail_vmfunc_fn_len(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_fn_len(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
 	if (!val)
@@ -636,7 +636,7 @@ void amtail_vmfunc_fn_len(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	new->li = (int64_t)l;
 }
 
-void amtail_vmfunc_fn_tolower(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_fn_tolower(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
 	if (!val)
@@ -653,7 +653,7 @@ void amtail_vmfunc_fn_tolower(amtail_thread *amt_thread, amtail_byteop *byte_ops
 	free(s);
 }
 
-void amtail_vmfunc_fn_timestamp(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_fn_timestamp(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	struct timespec ts;
 	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
@@ -666,7 +666,7 @@ void amtail_vmfunc_fn_timestamp(amtail_thread *amt_thread, amtail_byteop *byte_o
 	new->ld = (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0);
 }
 
-void amtail_vmfunc_fn_strptime(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_fn_strptime(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	/*
 	 * Parser does not yet preserve full call argument structure.
@@ -689,7 +689,7 @@ void amtail_vmfunc_fn_strptime(amtail_thread *amt_thread, amtail_byteop *byte_op
 	new->ld = epoch;
 }
 
-void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
@@ -749,32 +749,37 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	if (var->type == ALLIGATOR_VARTYPE_COUNTER && left->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		var->i = left->li;
-		fprintf(stderr, "load variable %s/%s: c/c %"PRIu64"\n", var->export_name->s, var->key, var->i);
+		if (amtail_ll.vm > 1)
+			fprintf(stderr, "load variable %s/%s: c/c %"PRIu64"\n", var->export_name->s, var->key, var->i);
 	}
 	else if (var->type == ALLIGATOR_VARTYPE_GAUGE && left->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		var->d = left->li;
-		fprintf(stderr, "load variable %s/%s: g/c %lf\n", var->export_name->s, var->key, var->d);
+		if (amtail_ll.vm > 1)
+			fprintf(stderr, "load variable %s/%s: g/c %lf\n", var->export_name->s, var->key, var->d);
 	}
 	else if (var->type == ALLIGATOR_VARTYPE_COUNTER && left->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		var->i = left->ld;
-		fprintf(stderr, "load variable %s/%s: c/g %"PRIu64"\n", var->export_name->s, var->key, var->i);
+		if (amtail_ll.vm > 1)
+			fprintf(stderr, "load variable %s/%s: c/g %"PRIu64"\n", var->export_name->s, var->key, var->i);
 	}
 	else if (var->type == ALLIGATOR_VARTYPE_GAUGE && left->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		var->d = left->ld;
-		fprintf(stderr, "load variable %s/%s: g/g %lf, by %p(%"PRIu8")\n", var->export_name->s, var->key, var->d, var->by, var->by_count);
+		if (amtail_ll.vm > 1) {
+			fprintf(stderr, "load variable %s/%s: g/g %lf, by %p(%"PRIu8")\n", var->export_name->s, var->key, var->d, var->by, var->by_count);
 			if (var->by && var->by_count)
 			{
 				for (uint64_t i = 0; i < var->by_count; ++i)
 					printf("\t\tby[%"PRIu64"] %s\n", i, var->by[i]->s);
 			}
+		}
 	}
 }
 // TODO end
 
-void amtail_vmfunc_inc(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_inc(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	if (!byte_ops || !byte_ops->export_name || !byte_ops->export_name->s)
 		return;
@@ -788,7 +793,7 @@ void amtail_vmfunc_inc(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	}
 }
 
-void amtail_vmfunc_dec(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_dec(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	if (!byte_ops || !byte_ops->export_name || !byte_ops->export_name->s)
 		return;
@@ -802,7 +807,7 @@ void amtail_vmfunc_dec(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	}
 }
 
-void amtail_vmfunc_variable(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_variable(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	uint32_t name_hash = amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l);
 	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, byte_ops->export_name->s, name_hash);
@@ -829,7 +834,7 @@ void amtail_vmfunc_variable(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 		fprintf(stderr, "error: variable called as '%s' already declared\n", byte_ops->export_name->s);
 }
 
-void amtail_vmfunc_noop(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+void amtail_vmfunc_noop(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 }
 
@@ -891,7 +896,7 @@ void amtail_thread_free(amtail_thread *amt_thread)
 	free(amt_thread);
 }
 
-int amtail_pre_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+int amtail_pre_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	if (byte_ops->opcode == AMTAIL_AST_OPCODE_BRANCH) // branch
 		return 2;
@@ -900,7 +905,7 @@ int amtail_pre_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	
 	{
 		//printf("byte_ops %p\n", byte_ops);
-		amtail_vmfunc[byte_ops->opcode](amt_thread, byte_ops, variables, logline);
+		amtail_vmfunc[byte_ops->opcode](amt_thread, byte_ops, variables, logline, amtail_ll);
 	}
 	else
 	{
@@ -919,7 +924,7 @@ uint64_t amtail_branch_select(amtail_byteop *byte_ops, alligator_ht *variables, 
 	//return
 }
 
-int amtail_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline)
+int amtail_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	if (byte_ops->opcode == AMTAIL_AST_OPCODE_BRANCH)
 		return 2;
@@ -970,7 +975,7 @@ int amtail_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator
 	)
 	{
 		//printf("\nbyte_ops %p code %d\n", byte_ops, byte_ops->opcode);
-		amtail_vmfunc[byte_ops->opcode](amt_thread, byte_ops, variables, logline);
+		amtail_vmfunc[byte_ops->opcode](amt_thread, byte_ops, variables, logline, amtail_ll);
 	}
 	else
 	{
@@ -1022,7 +1027,7 @@ void amtail_bytecode_dump(amtail_bytecode* byte_code)
 	}
 }
 
-int amtail_run(amtail_bytecode* byte_code, string* logline)
+int amtail_run(amtail_bytecode* byte_code, string* logline, amtail_log_level amtail_ll)
 {
 	uint64_t size = byte_code->l;
 	amtail_byteop *byte_ops = byte_code->ops;
@@ -1036,7 +1041,7 @@ int amtail_run(amtail_bytecode* byte_code, string* logline)
 	{
 		for (uint64_t i = 0; i < size; ++i)
 		{
-			amtail_pre_execute(amt_thread, &byte_ops[i], variables, logline);
+			amtail_pre_execute(amt_thread, &byte_ops[i], variables, logline, amtail_ll);
 		}
 		byte_code->prepared = 1;
 	}
@@ -1049,7 +1054,7 @@ int amtail_run(amtail_bytecode* byte_code, string* logline)
 		amtail_vm_stack_clear(amt_thread);
 		for (uint64_t i = 0; i < size; ++i)
 		{
-			rc = amtail_execute(amt_thread, &byte_ops[i], variables, logline);
+			rc = amtail_execute(amt_thread, &byte_ops[i], variables, logline, amtail_ll);
 			if (rc == 2) // branch
 			{
 				uint64_t new = amtail_branch_select(&byte_ops[i], variables, logline, cursym_log, line_size);
