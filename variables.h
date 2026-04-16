@@ -14,9 +14,15 @@ typedef struct amtail_variable {
 	};
 
 	uint8_t by_count;
-    string **by;
-    uint8_t *by_positions;
-    uint8_t is_template;
+	string **by;
+	uint8_t *by_positions;
+	uint8_t bucket_count;
+	string **bucket;
+	double *bucket_bounds;
+	uint64_t *bucket_hits;
+	double histogram_sum;
+	uint64_t histogram_count;
+	uint8_t is_template;
 
 	tommy_node node;
 } amtail_variable;

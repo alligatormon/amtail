@@ -12,6 +12,55 @@
 void (*amtail_vmfunc[256])(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll);
 void amtail_vmstack_push(amtail_thread *amt_thread, amtail_byteop *byte_ops);
 
+static int amtail_histogram_init(amtail_variable *var)
+{
+	if (!var || var->type != ALLIGATOR_VARTYPE_HISTOGRAM || !var->bucket_count || !var->bucket)
+		return 0;
+
+	if (!var->bucket_bounds)
+	{
+		var->bucket_bounds = calloc(var->bucket_count, sizeof(*var->bucket_bounds));
+		if (!var->bucket_bounds)
+			return 0;
+
+		for (uint8_t i = 0; i < var->bucket_count; ++i)
+		{
+			if (!var->bucket[i] || !var->bucket[i]->s)
+				continue;
+
+			char *end = NULL;
+			double bound = strtod(var->bucket[i]->s, &end);
+			if (!end || *end != '\0')
+				continue;
+			var->bucket_bounds[i] = bound;
+		}
+	}
+
+	if (!var->bucket_hits)
+	{
+		var->bucket_hits = calloc(var->bucket_count + 1, sizeof(*var->bucket_hits));
+		if (!var->bucket_hits)
+			return 0;
+	}
+
+	return 1;
+}
+
+static void amtail_histogram_observe(amtail_variable *var, double value)
+{
+	if (!var || !amtail_histogram_init(var))
+		return;
+
+	++var->histogram_count;
+	var->histogram_sum += value;
+
+	uint8_t i = 0;
+	while (i < var->bucket_count && value > var->bucket_bounds[i])
+		++i;
+	for (; i <= var->bucket_count; ++i)
+		++var->bucket_hits[i];
+}
+
 static void amtail_vm_free_tempop(amtail_byteop *op)
 {
 	if (!op || !op->allocated)
@@ -711,6 +760,8 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		uint8_t template_size = strcspn(right->export_name->s, "[");
 		strlcpy(template_name, right->export_name->s, template_size + 1);
 		amtail_variable *template_var = alligator_ht_search(variables, amtail_variable_compare, template_name, amtail_hash(template_name, template_size));
+		if (template_var)
+			vartype = template_var->type;
 
 		string *new_export_name = string_new();
 		string_cat(new_export_name, template_name, template_size);
@@ -718,6 +769,8 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		uint8_t *by_positions = NULL;
 		string **by = NULL;
 		uint8_t by_count = 0;
+		string **bucket = NULL;
+		uint8_t bucket_count = 0;
 
 		if (template_var && template_var->by && template_var->by_count) {
 			char *ptrby = key + template_size;
@@ -743,6 +796,15 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		}
 
 		var = amtail_variable_make(hidden, vartype, key, new_export_name, by, by_count, by_positions);
+		if (template_var && template_var->bucket && template_var->bucket_count)
+		{
+			bucket = template_var->bucket;
+			bucket_count = template_var->bucket_count;
+		}
+		var->bucket = bucket;
+		var->bucket_count = bucket_count;
+		if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM)
+			amtail_histogram_init(var);
 		alligator_ht_insert(variables, &(var->node), var, name_hash);
 	}
 
@@ -775,6 +837,13 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 					printf("\t\tby[%"PRIu64"] %s\n", i, var->by[i]->s);
 			}
 		}
+	}
+	else if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM)
+	{
+		if (left->vartype == ALLIGATOR_VARTYPE_COUNTER)
+			amtail_histogram_observe(var, (double)left->li);
+		else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE)
+			amtail_histogram_observe(var, left->ld);
 	}
 }
 // TODO end
@@ -825,8 +894,15 @@ void amtail_vmfunc_variable(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 			var->by = byte_ops->by;
 			var->is_template = 1;
 		}
+		if (byte_ops->bucket_count)
+		{
+			var->bucket_count = byte_ops->bucket_count;
+			var->bucket = byte_ops->bucket;
+		}
 
 		string_string_cat(var->export_name, byte_ops->export_name);
+		if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM && !var->is_template)
+			amtail_histogram_init(var);
 		printf("create variable %s with type %hhu and pointer: %p\n", byte_ops->export_name->s, byte_ops->vartype, var);
 		alligator_ht_insert(variables, &(var->node), var, name_hash);
 	}
