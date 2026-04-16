@@ -239,10 +239,10 @@ calculation_cluster* calculation_new(uint64_t size) {
 }
 
 void calculation_push_queue(calculation_cluster *calculation_expr, char *str, size_t len) {
-	if (len == 1)
-		printf("\tcalculation_push_queue is %p, ll is %llu, '%c'(1)\n", calculation_expr, (unsigned long long)calculation_expr->qcur, *str);
-	else
-		printf("\tcalculation_push_queue is %p, ll is %llu, '%s'(%zu)\n", calculation_expr, (unsigned long long)calculation_expr->qcur, str, len);
+	//if (len == 1)
+	//	printf("\tcalculation_push_queue is %p, ll is %llu, '%c'(1)\n", calculation_expr, (unsigned long long)calculation_expr->qcur, *str);
+	//else
+	//	printf("\tcalculation_push_queue is %p, ll is %llu, '%s'(%zu)\n", calculation_expr, (unsigned long long)calculation_expr->qcur, str, len);
 	calculation_expr->queue[calculation_expr->qcur].svalue = string_init_alloc(str, len);
 	calculation_expr->queue[calculation_expr->qcur].vartype = ALLIGATOR_VARTYPE_TEXT;
 	++calculation_expr->qcur;
@@ -294,7 +294,7 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 	if (!*calculation_ptr)
 		return;
 
-	printf("calculation_flush!\n");
+	//printf("calculation_flush!\n");
 	amtail_ast *cur = *ccur;
 
 	if (!cur)
@@ -321,7 +321,7 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 		calculation_push_queue(calculation_expr, &elem, 1);
 	}
 
-	printf("sval: ");
+	//printf("sval: ");
 	for (uint64_t i = 0; i < calculation_expr->qcur; ++i)
 	{
 		if (calculation_expr->queue[i].vartype == ALLIGATOR_VARTYPE_TEXT)

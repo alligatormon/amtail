@@ -188,9 +188,6 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
 
 	if (ast->vartype == ALLIGATOR_VARTYPE_CONST && ast->name && ast->name->s)
 	{
-		if (!strcmp(ast->name->s, "REST")) {
-			printf("DEBUG SET %s: %d\n", ast->name->s, ast->facttype);
-		}
 		if (ast->facttype == ALLIGATOR_FACTTYPE_INT)
 			fill->li = ast->ivalue;
 		else if (ast->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
