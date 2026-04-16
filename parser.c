@@ -321,14 +321,12 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 		calculation_push_queue(calculation_expr, &elem, 1);
 	}
 
-	//printf("sval: ");
 	for (uint64_t i = 0; i < calculation_expr->qcur; ++i)
 	{
 		if (calculation_expr->queue[i].vartype == ALLIGATOR_VARTYPE_TEXT)
 		{
 			char *expr = calculation_expr->queue[i].svalue->s;
 			uint64_t size = calculation_expr->queue[i].svalue->l;
-			printf(" '%s' ", expr);
 			cur->name = string_init_alloc(expr, size);
 			if (*expr == '^')
 				cur->opcode = AMTAIL_AST_OPCODE_POW;
@@ -362,7 +360,6 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 		cur->stem = amtail_ast_multi_init(2);
 		cur = cur->stem[AMTAIL_AST_LEFT];
 	}
-	puts("");
 
 	cur->opcode = AMTAIL_AST_OPCODE_RUN;
 	amtail_ast_stack_push(stack, cur);
