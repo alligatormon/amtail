@@ -249,30 +249,26 @@ void calculation_push_queue(calculation_cluster *calculation_expr, char *str, si
 }
 
 void calculation_push_stack(calculation_cluster *calculation_expr, char str) {
-	printf("\tcalculation_push_stack is %p, ll is %llu, sym '%c'\n", calculation_expr, (unsigned long long)calculation_expr->scur, str);
+	//printf("\tcalculation_push_stack is %p, ll is %llu, sym '%c'\n", calculation_expr, (unsigned long long)calculation_expr->scur, str);
 	calculation_expr->stack[calculation_expr->scur++] = str;
 }
 
 char calculation_pop_stack(calculation_cluster *calculation_expr) {
 	if (calculation_expr->scur < 1)
 		return 0;
-	printf("\tcalculation_pop_stack is %p, ll is %llu, pop sym: '%c'\n",
-	       calculation_expr, (unsigned long long)calculation_expr->scur,
-	       calculation_expr->stack[calculation_expr->scur-1]);
+	//printf("\tcalculation_pop_stack is %p, ll is %llu, pop sym: '%c'\n", calculation_expr, (unsigned long long)calculation_expr->scur, calculation_expr->stack[calculation_expr->scur-1]);
 	return calculation_expr->stack[--calculation_expr->scur];
 }
 
 char calculation_peek_stack(calculation_cluster *calculation_expr) {
 	if (calculation_expr->scur < 1)
 		return 0;
-	printf("\tcalculation_peek_stack is %p, ll is %llu, peek sym: '%c'\n",
-	       calculation_expr, (unsigned long long)calculation_expr->scur,
-	       calculation_expr->stack[calculation_expr->scur-1]);
+	//printf("\tcalculation_peek_stack is %p, ll is %llu, peek sym: '%c'\n", calculation_expr, (unsigned long long)calculation_expr->scur, calculation_expr->stack[calculation_expr->scur-1]);
 	return calculation_expr->stack[calculation_expr->scur-1];
 }
 
 void calculation_del_queue(calculation_cluster *cc) {
-	printf("\tcc delete %p\n", cc);
+	//printf("\tcc delete %p\n", cc);
 	for (uint64_t i = 0; i < cc->qmax; ++i)
 	{
 		if (cc->queue[i].vartype == ALLIGATOR_VARTYPE_TEXT)
