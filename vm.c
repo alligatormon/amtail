@@ -258,12 +258,12 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		resolved->ld = byte_ops->ld;
 }
 
-uint64_t amtail_vmfunc_branch(amtail_byteop *byte_ops, alligator_ht *variables, string *logline, uint64_t offset, uint64_t line_size)
+uint64_t amtail_vmfunc_branch(amtail_byteop *byte_ops, alligator_ht *variables, string *logline, uint64_t offset, uint64_t line_size, amtail_log_level amtail_ll)
 {
 	if (!byte_ops || !byte_ops->re_match || !logline || !logline->s)
 		return byte_ops ? byte_ops->right_opcounter : 0;
 
-	uint8_t match = amtail_regex_exec(byte_ops->re_match, logline->s+offset, line_size);
+	uint8_t match = amtail_regex_exec(byte_ops->re_match, logline->s+offset, line_size, amtail_ll);
 	//fprintf(stderr, "branch pcre '%s' (jmp %"PRIu64", res: %"PRIu8" with logline '%p'\n", byte_ops->export_name->s+1, byte_ops->right_opcounter, match, logline->s);
 	if (match)
 		return 0;
@@ -534,7 +534,7 @@ void amtail_vmfunc_match(amtail_thread *amt_thread, amtail_byteop *byte_ops, all
 		return;
 	}
 
-	amtail_vm_push_bool(amt_thread, amtail_regex_exec(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size) ? 1 : 0);
+	amtail_vm_push_bool(amt_thread, amtail_regex_exec(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size, amtail_ll) ? 1 : 0);
 }
 
 void amtail_vmfunc_notmatch(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
@@ -545,7 +545,7 @@ void amtail_vmfunc_notmatch(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 		return;
 	}
 
-	amtail_vm_push_bool(amt_thread, amtail_regex_exec(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size) ? 0 : 1);
+	amtail_vm_push_bool(amt_thread, amtail_regex_exec(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size, amtail_ll) ? 0 : 1);
 }
 
 void amtail_vmfunc_cast_int(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
@@ -914,12 +914,12 @@ int amtail_pre_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	return 1;
 }
 
-uint64_t amtail_branch_select(amtail_byteop *byte_ops, alligator_ht *variables, string *logline, uint64_t offset, uint64_t line_size)
+uint64_t amtail_branch_select(amtail_byteop *byte_ops, alligator_ht *variables, string *logline, uint64_t offset, uint64_t line_size, amtail_log_level amtail_ll)
 {
 	//if 
 	//	(byte_ops->opcode == AMTAIL_AST_OPCODE_BRANCH)
 	
-		return amtail_vmfunc_branch(byte_ops, variables, logline, offset, line_size);
+		return amtail_vmfunc_branch(byte_ops, variables, logline, offset, line_size, amtail_ll);
 
 	//return
 }
@@ -1057,7 +1057,7 @@ int amtail_run(amtail_bytecode* byte_code, string* logline, amtail_log_level amt
 			rc = amtail_execute(amt_thread, &byte_ops[i], variables, logline, amtail_ll);
 			if (rc == 2) // branch
 			{
-				uint64_t new = amtail_branch_select(&byte_ops[i], variables, logline, cursym_log, line_size);
+				uint64_t new = amtail_branch_select(&byte_ops[i], variables, logline, cursym_log, line_size, amtail_ll);
 				if (new)
 					i = new;
 			}

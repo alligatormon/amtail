@@ -20,6 +20,7 @@ void run_tests(char *dir, char *file, string *logline)
 		.parser = 0,
 		.lexer = 0,
 		.compiler = 0,
+		.pcre = 3,
 	};
 	amtail_bytecode* byte_code = amtail_compile(file, str, amtail_ll);
 	amtail_run(byte_code, logline, amtail_ll);
@@ -35,6 +36,7 @@ void run_tests_file(char *dir, char *file, char *log_filename)
 		.lexer = 0,
 		.generator = 0,
 		.compiler = 0,
+		.pcre = 3,
 	};
 	amtail_bytecode* byte_code = amtail_compile(file, str, amtail_ll);
 	if (!byte_code)
@@ -79,6 +81,7 @@ static int run_mtail_script_with_log(const char *script_path, const char *log_pa
 		.lexer = 0,
 		.generator = 0,
 		.compiler = 0,
+		.pcre = 1,
 	};
 
 	string *script = string_init_dup((char*)script_path);
