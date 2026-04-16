@@ -903,11 +903,13 @@ void amtail_vmfunc_variable(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 		string_string_cat(var->export_name, byte_ops->export_name);
 		if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM && !var->is_template)
 			amtail_histogram_init(var);
-		printf("create variable %s with type %hhu and pointer: %p\n", byte_ops->export_name->s, byte_ops->vartype, var);
+		if (amtail_ll.vm > 1)
+			printf("create variable %s with type %hhu and pointer: %p\n", byte_ops->export_name->s, byte_ops->vartype, var);
 		alligator_ht_insert(variables, &(var->node), var, name_hash);
 	}
 	else
-		fprintf(stderr, "error: variable called as '%s' already declared\n", byte_ops->export_name->s);
+		if (amtail_ll.vm > 0)
+			fprintf(stderr, "error: variable called as '%s' already declared\n", byte_ops->export_name->s);
 }
 
 void amtail_vmfunc_noop(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
