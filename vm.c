@@ -12,6 +12,85 @@
 void (*amtail_vmfunc[256])(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll);
 void amtail_vmstack_push(amtail_thread *amt_thread, amtail_byteop *byte_ops);
 
+static void amtail_vm_set_capture_variable(alligator_ht *variables, const char *name, const char *value, size_t value_len)
+{
+	if (!variables || !name || !*name)
+		return;
+
+	size_t name_len = strlen(name);
+	char *prefixed = calloc(1, name_len + 2);
+	if (!prefixed)
+		return;
+	prefixed[0] = '$';
+	memcpy(prefixed + 1, name, name_len);
+
+	uint32_t name_hash = amtail_hash(prefixed, name_len + 1);
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, prefixed, name_hash);
+	if (!var)
+	{
+		var = calloc(1, sizeof(*var));
+		if (!var)
+		{
+			free(prefixed);
+			return;
+		}
+		var->hidden = 1;
+		var->type = ALLIGATOR_VARTYPE_TEXT;
+		var->key = prefixed;
+		var->export_name = string_init_dup(prefixed);
+		alligator_ht_insert(variables, &(var->node), var, name_hash);
+	}
+	else
+	{
+		free(prefixed);
+		if (var->s)
+		{
+			string_free(var->s);
+			var->s = NULL;
+		}
+		var->type = ALLIGATOR_VARTYPE_TEXT;
+	}
+
+	var->s = string_init_alloc((char*)value, value_len);
+}
+
+static void amtail_vm_apply_named_captures(regex_match *rematch, char *line, uint64_t line_size, alligator_ht *variables)
+{
+	if (!rematch || !line || !line_size || !variables || !rematch->regex_compiled)
+		return;
+
+	int ovector[240];
+	int count = pcre_exec(rematch->regex_compiled, rematch->pcreExtra, line, (int)line_size, 0, 0, ovector, 240);
+	if (count <= 0)
+		return;
+
+	int namecount = 0;
+	int entry_size = 0;
+	unsigned char *name_table = NULL;
+	if (pcre_fullinfo(rematch->regex_compiled, rematch->pcreExtra, PCRE_INFO_NAMECOUNT, &namecount) < 0 || namecount <= 0)
+		return;
+	if (pcre_fullinfo(rematch->regex_compiled, rematch->pcreExtra, PCRE_INFO_NAMEENTRYSIZE, &entry_size) < 0 || entry_size <= 0)
+		return;
+	if (pcre_fullinfo(rematch->regex_compiled, rematch->pcreExtra, PCRE_INFO_NAMETABLE, &name_table) < 0 || !name_table)
+		return;
+
+	for (int i = 0; i < namecount; ++i)
+	{
+		unsigned char *entry = name_table + i * entry_size;
+		int group_index = (entry[0] << 8) | entry[1];
+		if (group_index <= 0 || group_index >= count)
+			continue;
+
+		int start = ovector[2 * group_index];
+		int end = ovector[2 * group_index + 1];
+		if (start < 0 || end < start || (uint64_t)end > line_size)
+			continue;
+
+		const char *group_name = (const char*)(entry + 2);
+		amtail_vm_set_capture_variable(variables, group_name, line + start, (size_t)(end - start));
+	}
+}
+
 static int amtail_histogram_init(amtail_variable *var)
 {
 	if (!var || var->type != ALLIGATOR_VARTYPE_HISTOGRAM || !var->bucket_count || !var->bucket)
@@ -190,6 +269,108 @@ static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables
 	return NULL;
 }
 
+static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *variables)
+{
+	if (!name || !*name || !variables)
+		return NULL;
+
+	size_t name_len = strlen(name);
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, (void*)name, amtail_hash((char*)name, name_len));
+	if (!var && name[0] == '$' && name[1])
+	{
+		const char *trimmed = name + 1;
+		size_t trimmed_len = strlen(trimmed);
+		var = alligator_ht_search(variables, amtail_variable_compare, (void*)trimmed, amtail_hash((char*)trimmed, trimmed_len));
+	}
+
+	if (!var)
+		return NULL;
+
+	if (var->type == ALLIGATOR_VARTYPE_TEXT && var->s && var->s->s)
+		return strdup(var->s->s);
+	if (var->type == ALLIGATOR_VARTYPE_CONST && var->facttype == ALLIGATOR_FACTTYPE_TEXT && var->s && var->s->s)
+		return strdup(var->s->s);
+	if (var->type == ALLIGATOR_VARTYPE_COUNTER || (var->type == ALLIGATOR_VARTYPE_CONST && var->facttype == ALLIGATOR_FACTTYPE_INT))
+	{
+		char buf[64];
+		snprintf(buf, sizeof(buf), "%"PRId64, var->i);
+		return strdup(buf);
+	}
+	if (var->type == ALLIGATOR_VARTYPE_GAUGE || (var->type == ALLIGATOR_VARTYPE_CONST && var->facttype == ALLIGATOR_FACTTYPE_DOUBLE))
+	{
+		char buf[64];
+		snprintf(buf, sizeof(buf), "%.17g", var->d);
+		return strdup(buf);
+	}
+
+	return NULL;
+}
+
+static char *amtail_vm_interpolate_metric_key(const char *raw_key, alligator_ht *variables)
+{
+	if (!raw_key)
+		return NULL;
+
+	size_t cap = strlen(raw_key) + 1;
+	char *out = calloc(1, cap);
+	if (!out)
+		return NULL;
+
+	size_t oi = 0;
+	const char *p = raw_key;
+	while (*p)
+	{
+		if (p[0] == '[' && p[1] == '$')
+		{
+			const char *end = strchr(p, ']');
+			if (end)
+			{
+				size_t token_len = (size_t)(end - (p + 1));
+				char *token = strndup(p + 1, token_len); /* includes leading '$' */
+				char *resolved = token ? amtail_vm_lookup_variable_string(token, variables) : NULL;
+				const char *emit = resolved ? resolved : token;
+				size_t emit_len = emit ? strlen(emit) : 0;
+
+				if (oi + emit_len + 2 >= cap)
+				{
+					cap = (oi + emit_len + 2) * 2;
+					out = realloc(out, cap);
+					if (!out)
+					{
+						free(token);
+						free(resolved);
+						return NULL;
+					}
+				}
+
+				out[oi++] = '[';
+				if (emit_len)
+				{
+					memcpy(out + oi, emit, emit_len);
+					oi += emit_len;
+				}
+				out[oi++] = ']';
+
+				free(token);
+				free(resolved);
+				p = end + 1;
+				continue;
+			}
+		}
+
+		if (oi + 2 >= cap)
+		{
+			cap *= 2;
+			out = realloc(out, cap);
+			if (!out)
+				return NULL;
+		}
+		out[oi++] = *p++;
+	}
+	out[oi] = '\0';
+	return out;
+}
+
 static void amtail_vm_push_text(amtail_thread *amt_thread, const char *text)
 {
 	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
@@ -265,9 +446,9 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	if (!resolved)
 		return;
 
-	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare,
-	                                           byte_ops->export_name->s,
-	                                           amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l));
+	char *resolved_key = amtail_vm_interpolate_metric_key(byte_ops->export_name->s, variables);
+	char *lookup_key = resolved_key ? resolved_key : byte_ops->export_name->s;
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, lookup_key,amtail_hash(lookup_key, strlen(lookup_key)));
 	if (var)
 	{
 		resolved->vartype = var->type;
@@ -296,8 +477,10 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 				resolved->ls = string_string_init_dup(var->s);
 			}
 		}
+		free(resolved_key);
 		return;
 	}
+	free(resolved_key);
 
 	/* Fallback for inline numeric literals emitted by parser. */
 	resolved->vartype = byte_ops->vartype;
@@ -313,6 +496,8 @@ uint64_t amtail_vmfunc_branch(amtail_byteop *byte_ops, alligator_ht *variables, 
 		return byte_ops ? byte_ops->right_opcounter : 0;
 
 	uint8_t match = amtail_regex_exec(byte_ops->re_match, logline->s+offset, line_size, amtail_ll);
+	if (match)
+		amtail_vm_apply_named_captures(byte_ops->re_match, logline->s + offset, line_size, variables);
 	//fprintf(stderr, "branch pcre '%s' (jmp %"PRIu64", res: %"PRIu8" with logline '%p'\n", byte_ops->export_name->s+1, byte_ops->right_opcounter, match, logline->s);
 	if (match)
 		return 0;
@@ -583,7 +768,10 @@ void amtail_vmfunc_match(amtail_thread *amt_thread, amtail_byteop *byte_ops, all
 		return;
 	}
 
-	amtail_vm_push_bool(amt_thread, amtail_regex_exec(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size, amtail_ll) ? 1 : 0);
+	uint8_t matched = amtail_regex_exec(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size, amtail_ll) ? 1 : 0;
+	if (matched)
+		amtail_vm_apply_named_captures(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size, variables);
+	amtail_vm_push_bool(amt_thread, matched);
 }
 
 void amtail_vmfunc_notmatch(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
@@ -748,13 +936,20 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	if (!new)
 		return;
 
-	uint32_t name_hash = amtail_hash(right->export_name->s, right->export_name->l);
-	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, right->export_name->s, name_hash);
+	char *resolved_key = amtail_vm_interpolate_metric_key(right->export_name->s, variables);
+	if (!resolved_key)
+		resolved_key = strdup(right->export_name->s);
+	if (!resolved_key)
+		return;
+
+	uint32_t name_hash = amtail_hash(resolved_key, strlen(resolved_key));
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, resolved_key, name_hash);
 	if (!var)
 	{
 		uint8_t hidden = 0; // TODO
 		uint8_t vartype = left->vartype;
-		char *key = strdup(right->export_name->s);
+		char *key = resolved_key;
+		resolved_key = NULL;
 
 		char template_name[255];
 		uint8_t template_size = strcspn(right->export_name->s, "[");
@@ -807,6 +1002,8 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 			amtail_histogram_init(var);
 		alligator_ht_insert(variables, &(var->node), var, name_hash);
 	}
+	else
+		free(resolved_key);
 
 	if (var->type == ALLIGATOR_VARTYPE_COUNTER && left->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
