@@ -148,7 +148,6 @@ amtail_bytecode* amtail_code_init(uint64_t size)
 {
 	amtail_bytecode *byte_code = calloc(1, sizeof(*byte_code));
 	byte_code->ops = calloc(1, sizeof(amtail_byteop) * size);
-	byte_code->variables = alligator_ht_init(NULL);
 
 	byte_code->m = size;
 	byte_code->l = 0;
@@ -387,11 +386,7 @@ void amtail_code_free(amtail_bytecode *byte_code)
 			amtail_regex_free(ops->re_match);
 	}
 
-	if (byte_code->variables)
-	{
-		alligator_ht_done(byte_code->variables);
-		free(byte_code->variables);
-	}
+
 	free(byte_code->ops);
 	free(byte_code);
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include "generator.h"
+#include "variables.h"
 #define AMTAIL_VM_STACK_SIZE 1024
 
 typedef struct amtail_thread {
@@ -10,5 +11,5 @@ typedef struct amtail_thread {
 } amtail_thread;
 
 void amtail_bytecode_dump(amtail_bytecode* byte_code);
-int amtail_run(amtail_bytecode* byte_code, string* logline, amtail_log_level amtail_ll);
+int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, amtail_log_level amtail_ll);
 void amtail_vm_init();

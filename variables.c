@@ -106,6 +106,13 @@ int variable_parse_set_value(amtail_variable *var, string *s)
     return 1;
 }
 
+alligator_ht* amtail_variables_init()
+{
+	alligator_ht *variables = alligator_ht_init(NULL);
+	return variables;
+}
+
+
 amtail_variable* amtail_variable_make(uint8_t hidden, uint8_t vartype, char *key, string *export_name, string **by, uint8_t by_count, uint8_t* by_positions)
 {
 	amtail_variable *var = calloc(1, sizeof(*var));
@@ -125,4 +132,27 @@ inline uint32_t amtail_hash(char *str, uint64_t syms)
 	if (!str || !syms)
 		return 0;
 	return (uint32_t)(((uint8_t)str[0] * 33u) + (uint8_t)str[syms - 1]);
+}
+
+void amtail_variable_free(void *funcarg, void* arg)
+{
+	amtail_variable *var = arg;
+	if (!var)
+		return;
+	if (var->export_name)
+		string_free(var->export_name);
+	if (var->key)
+		free(var->key);
+	if ((var->type == ALLIGATOR_VARTYPE_TEXT || var->type == ALLIGATOR_VARTYPE_CONST) && var->s)
+		string_free(var->s);
+	if (var->by_positions)
+		free(var->by_positions);
+	free(var);
+}
+
+void amtail_variables_free(alligator_ht *variables)
+{
+	alligator_ht_foreach_arg(variables, amtail_variable_free, NULL);
+	alligator_ht_done(variables);
+	free(variables);
 }

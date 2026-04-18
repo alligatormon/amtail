@@ -33,3 +33,4 @@ uint32_t amtail_hash(char *str, uint64_t syms);
 amtail_variable* amtail_variable_make(uint8_t hidden, uint8_t vartype, char *key, string *export_name, string **by, uint8_t by_count, uint8_t* by_positions);
 int variable_parse_set_value(amtail_variable *var, string *s);
 int amtail_variable_compare(const void* arg, const void* obj);
+alligator_ht* amtail_variables_init();

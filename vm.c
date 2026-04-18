@@ -1302,11 +1302,10 @@ void amtail_bytecode_dump(amtail_bytecode* byte_code)
 	}
 }
 
-int amtail_run(amtail_bytecode* byte_code, string* logline, amtail_log_level amtail_ll)
+int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, amtail_log_level amtail_ll)
 {
 	uint64_t size = byte_code->l;
 	amtail_byteop *byte_ops = byte_code->ops;
-	alligator_ht *variables = byte_code->variables;
 	int rc;
 	uint64_t line_size = 0;
 
