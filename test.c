@@ -382,30 +382,12 @@ static int generator_test_file_subprocess(const char *script_path, amtail_log_le
 	return 0;
 }
 
-static void runtime_var_free_cb(void *arg)
-{
-	amtail_variable *var = arg;
-	if (!var)
-		return;
-
-	if (var->export_name)
-		string_free(var->export_name);
-	if (var->key)
-		free(var->key);
-	if ((var->type == ALLIGATOR_VARTYPE_TEXT || var->type == ALLIGATOR_VARTYPE_CONST) && var->s)
-		string_free(var->s);
-	if (var->by_positions)
-		free(var->by_positions);
-	free(var);
-}
-
 static amtail_bytecode* runtime_bc_new(size_t op_count)
 {
 	amtail_bytecode *bc = calloc(1, sizeof(*bc));
 	bc->ops = calloc(op_count, sizeof(*bc->ops));
 	bc->m = op_count;
 	bc->l = op_count;
-	bc->variables = alligator_ht_init(NULL);
 	return bc;
 }
 
@@ -419,11 +401,6 @@ static void runtime_bc_free(amtail_bytecode *bc)
 			string_free(bc->ops[i].export_name);
 		if (bc->ops[i].re_match)
 			amtail_regex_free(bc->ops[i].re_match);
-	}
-	if (bc->variables)
-	{
-		alligator_ht_forfree(bc->variables, runtime_var_free_cb);
-		free(bc->variables);
 	}
 	free(bc->ops);
 	free(bc);
@@ -465,7 +442,7 @@ static int vm_runtime_test_timestamp(void)
 	alligator_ht *variables = amtail_variables_init();
 	string *line = string_init_dup("x\n");
 	int rc = amtail_run(bc, variables, line, amtail_ll);
-	int ok = rc && runtime_expect_gauge_positive(bc->variables, "ts");
+	int ok = rc && runtime_expect_gauge_positive(variables, "ts");
 	string_free(line);
 	amtail_variables_free(variables);
 	runtime_bc_free(bc);
@@ -489,10 +466,10 @@ static int vm_runtime_test_len_strtol(void)
 		bc->ops[2].export_name = string_init_dup("msg");
 		bc->ops[3].opcode = AMTAIL_AST_OPCODE_FUNC_LEN;
 		bc->ops[4].opcode = AMTAIL_AST_OPCODE_RUN;
-		runtime_insert_text(bc->variables, "msg", "Hello");
 		alligator_ht *variables = amtail_variables_init();
+		runtime_insert_text(variables, "msg", "Hello");
 		string *line = string_init_dup("x\n");
-		ok = ok && amtail_run(bc, variables, line, amtail_ll) && runtime_expect_counter(bc->variables, "lenv", 5);
+		ok = ok && amtail_run(bc, variables, line, amtail_ll) && runtime_expect_counter(variables, "lenv", 5);
 		string_free(line);
 		amtail_variables_free(variables);
 		runtime_bc_free(bc);
@@ -510,10 +487,10 @@ static int vm_runtime_test_len_strtol(void)
 		bc->ops[2].export_name = string_init_dup("numtxt");
 		bc->ops[3].opcode = AMTAIL_AST_OPCODE_FUNC_STRTOL;
 		bc->ops[4].opcode = AMTAIL_AST_OPCODE_RUN;
-		runtime_insert_text(bc->variables, "numtxt", "42");
 		alligator_ht *variables = amtail_variables_init();
+		runtime_insert_text(variables, "numtxt", "42");
 		string *line = string_init_dup("x\n");
-		ok = ok && amtail_run(bc, variables, line, amtail_ll) && runtime_expect_counter(bc->variables, "ival", 42);
+		ok = ok && amtail_run(bc, variables, line, amtail_ll) && runtime_expect_counter(variables, "ival", 42);
 		amtail_variables_free(variables);
 		string_free(line);
 		runtime_bc_free(bc);
@@ -539,10 +516,10 @@ static int vm_runtime_test_strptime_and_match(void)
 		bc->ops[2].export_name = string_init_dup("datestr");
 		bc->ops[3].opcode = AMTAIL_AST_OPCODE_FUNC_STRPTIME;
 		bc->ops[4].opcode = AMTAIL_AST_OPCODE_RUN;
-		runtime_insert_text(bc->variables, "datestr", "2024-01-02 03:04:05");
-		string *line = string_init_dup("x\n");
 		alligator_ht *variables = amtail_variables_init();
-		ok = ok && amtail_run(bc, variables, line, amtail_ll) && runtime_expect_gauge_positive(bc->variables, "parsed");
+		runtime_insert_text(variables, "datestr", "2024-01-02 03:04:05");
+		string *line = string_init_dup("x\n");
+		ok = ok && amtail_run(bc, variables, line, amtail_ll) && runtime_expect_gauge_positive(variables, "parsed");
 		amtail_variables_free(variables);
 		string_free(line);
 		runtime_bc_free(bc);

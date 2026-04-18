@@ -49,11 +49,12 @@ void amtail_variables_dump_foreach(void *funcarg, void* arg)
 		else if (var->type == ALLIGATOR_VARTYPE_GAUGE)
 			string_double(dst, var->d);
 		else if (var->type == ALLIGATOR_VARTYPE_CONST) {
+			printf("facttype is %d, name is %s\n", var->facttype, var->export_name->s);
 			if (var->facttype == ALLIGATOR_FACTTYPE_TEXT)
 				string_string_cat(dst, var->s);
 			else if (var->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
 				string_double(dst, var->d);
-			else if (var->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
+			else if (var->facttype == ALLIGATOR_FACTTYPE_INT)
 				string_int(dst, var->i);
 		}
 		else if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM)
