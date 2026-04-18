@@ -1098,6 +1098,16 @@ void amtail_vmfunc_variable(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 		}
 
 		string_string_cat(var->export_name, byte_ops->export_name);
+		if (var->type == ALLIGATOR_VARTYPE_CONST)
+		{
+			var->facttype = byte_ops->facttype;
+			if (byte_ops->facttype == ALLIGATOR_FACTTYPE_INT)
+				var->i = byte_ops->li;
+			else if (byte_ops->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
+				var->d = byte_ops->ld;
+			else if (byte_ops->facttype == ALLIGATOR_FACTTYPE_TEXT && byte_ops->ls && byte_ops->ls->s)
+				var->s = string_string_init_dup(byte_ops->ls);
+		}
 		if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM && !var->is_template)
 			amtail_histogram_init(var);
 		if (amtail_ll.vm > 1)
