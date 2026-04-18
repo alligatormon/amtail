@@ -34,3 +34,4 @@ amtail_variable* amtail_variable_make(uint8_t hidden, uint8_t vartype, char *key
 int variable_parse_set_value(amtail_variable *var, string *s);
 int amtail_variable_compare(const void* arg, const void* obj);
 alligator_ht* amtail_variables_init();
+void amtail_variables_free(alligator_ht *variables);
