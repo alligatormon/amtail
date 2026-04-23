@@ -353,9 +353,12 @@ static int amtail_vm_cast_to_int64(amtail_byteop *val, alligator_ht *variables, 
 
 	char *end = NULL;
 	long long parsed = strtoll(s, &end, 10);
-	free(s);
 	if (!end || *end != '\0')
+	{
+		free(s);
 		return 0;
+	}
+	free(s);
 
 	*out = (int64_t)parsed;
 	return 1;
@@ -379,8 +382,9 @@ static int amtail_vm_cast_to_double(amtail_byteop *val, alligator_ht *variables,
 
 	char *end = NULL;
 	double parsed = strtod(s, &end);
+	int parse_ok = (end && *end == '\0');
 	free(s);
-	if (!end || *end != '\0')
+	if (!parse_ok)
 		return 0;
 
 	*out = parsed;
@@ -681,6 +685,27 @@ static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byt
 	if (!byte_ops)
 		return 0;
 
+	/*
+	 * Prefer already-evaluated condition from VM stack (e.g. EQ/NE result).
+	 * This also consumes temporary booleans and prevents stack leakage.
+	 */
+	amtail_byteop *cond = amtail_vmstack_pop(amt_thread);
+	if (cond)
+	{
+		double num = 0;
+		if (amtail_vm_get_number(cond, &num))
+		{
+			int rc = num != 0;
+			amtail_vm_free_tempop(cond);
+			return rc;
+		}
+		char *s = amtail_vm_resolve_string(cond, variables);
+		int rc = s && *s;
+		free(s);
+		amtail_vm_free_tempop(cond);
+		return rc;
+	}
+
 	char *lhs = NULL, *rhs = NULL;
 	if (byte_ops->export_name && byte_ops->export_name->s &&
 	    amtail_vm_extract_binary_operands(byte_ops->export_name->s, &lhs, &rhs))
@@ -702,13 +727,6 @@ static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byt
 		free(rhs);
 		return matched;
 	}
-
-	amtail_byteop *cond = amtail_vmstack_pop(amt_thread);
-	if (!cond)
-		return 0;
-	double num = 0;
-	if (amtail_vm_get_number(cond, &num))
-		return num != 0;
 	return 0;
 }
 
@@ -718,7 +736,10 @@ uint64_t amtail_vmfunc_branch(amtail_thread *amt_thread, amtail_byteop *byte_ops
 		return 0;
 
 	if (!byte_ops->re_match)
-		return amtail_vm_branch_condition_true(amt_thread, byte_ops, variables) ? 0 : byte_ops->right_opcounter;
+	{
+		int cond = amtail_vm_branch_condition_true(amt_thread, byte_ops, variables);
+		return cond ? 0 : byte_ops->right_opcounter;
+	}
 
 	uint8_t match = amtail_regex_exec(byte_ops->re_match, logline->s+offset, line_size, amtail_ll);
 	if (match)
@@ -1075,7 +1096,9 @@ void amtail_vmfunc_cast_int(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 		return;
 
 	int64_t iv = 0;
-	if (!amtail_vm_cast_to_int64(val, variables, &iv))
+	int ok = amtail_vm_cast_to_int64(val, variables, &iv);
+	amtail_vm_free_tempop(val);
+	if (!ok)
 		return;
 
 	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
@@ -1091,7 +1114,9 @@ void amtail_vmfunc_cast_float(amtail_thread *amt_thread, amtail_byteop *byte_ops
 	if (!val)
 		return;
 	double v = 0;
-	if (!amtail_vm_cast_to_double(val, variables, &v))
+	int ok = amtail_vm_cast_to_double(val, variables, &v);
+	amtail_vm_free_tempop(val);
+	if (!ok)
 		return;
 
 	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
@@ -1107,7 +1132,9 @@ void amtail_vmfunc_cast_bool(amtail_thread *amt_thread, amtail_byteop *byte_ops,
 	if (!val)
 		return;
 	double v = 0;
-	if (!amtail_vm_get_number(val, &v))
+	int ok = amtail_vm_get_number(val, &v);
+	amtail_vm_free_tempop(val);
+	if (!ok)
 		return;
 
 	amtail_vm_push_bool(amt_thread, v != 0);
@@ -1120,6 +1147,7 @@ void amtail_vmfunc_cast_string(amtail_thread *amt_thread, amtail_byteop *byte_op
 		return;
 
 	char *s = amtail_vm_resolve_string(val, variables);
+	amtail_vm_free_tempop(val);
 	if (!s)
 		return;
 
@@ -1132,7 +1160,10 @@ void amtail_vmfunc_fn_strtol(amtail_thread *amt_thread, amtail_byteop *byte_ops,
 	amtail_byteop *base_op = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
 	if (!val)
+	{
+		amtail_vm_free_tempop(base_op);
 		return;
+	}
 
 	int64_t base = 10;
 	if (base_op)
@@ -1140,17 +1171,20 @@ void amtail_vmfunc_fn_strtol(amtail_thread *amt_thread, amtail_byteop *byte_ops,
 		int64_t parsed_base = 0;
 		if (amtail_vm_cast_to_int64(base_op, variables, &parsed_base) && parsed_base >= 2 && parsed_base <= 36)
 			base = parsed_base;
+		amtail_vm_free_tempop(base_op);
 	}
 
 	char *s = amtail_vm_resolve_string(val, variables);
+	amtail_vm_free_tempop(val);
 	if (!s)
 		return;
 
 	char *end = NULL;
 	long long n = strtoll(s, &end, (int)base);
+	int parse_ok = (end && *end == '\0');
 	free(s);
 
-	if (!end || *end != '\0')
+	if (!parse_ok)
 		return;
 
 	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
@@ -1167,6 +1201,7 @@ void amtail_vmfunc_fn_len(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 		return;
 
 	char *s = amtail_vm_resolve_string(val, variables);
+	amtail_vm_free_tempop(val);
 	if (!s)
 		return;
 
@@ -1187,6 +1222,7 @@ void amtail_vmfunc_fn_tolower(amtail_thread *amt_thread, amtail_byteop *byte_ops
 		return;
 
 	char *s = amtail_vm_resolve_string(val, variables);
+	amtail_vm_free_tempop(val);
 	if (!s)
 		return;
 
@@ -1221,6 +1257,7 @@ void amtail_vmfunc_fn_strptime(amtail_thread *amt_thread, amtail_byteop *byte_op
 		return;
 
 	char *s = amtail_vm_resolve_string(val, variables);
+	amtail_vm_free_tempop(val);
 	if (!s)
 		return;
 	double epoch = amtail_vm_parse_epoch_string(s);
@@ -1236,12 +1273,35 @@ void amtail_vmfunc_fn_strptime(amtail_thread *amt_thread, amtail_byteop *byte_op
 void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
-	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
-	if (!left || !right || !right->export_name || !right->export_name->s)
+	if (!left)
+	{
+		amtail_vm_stack_clear(amt_thread);
 		return;
-	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
-	if (!new)
+	}
+
+	/*
+	 * Robustly locate the assignment target marker on stack.
+	 * The VM may carry temporary values between ops, so don't assume
+	 * fixed [value, assign] layout.
+	 */
+	amtail_byteop *right = NULL;
+	amtail_byteop *candidate = NULL;
+	while ((candidate = amtail_vmstack_pop(amt_thread)))
+	{
+		if (candidate->opcode == AMTAIL_AST_OPCODE_ASSIGN)
+		{
+			right = candidate;
+			break;
+		}
+		amtail_vm_free_tempop(candidate);
+	}
+
+	if (!right || !right->export_name || !right->export_name->s)
+	{
+		amtail_vm_free_tempop(left);
+		amtail_vm_stack_clear(amt_thread);
 		return;
+	}
 
 	char *resolved_key = amtail_vm_interpolate_metric_key(right->export_name->s, variables);
 	if (!resolved_key)
@@ -1349,6 +1409,11 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE)
 			amtail_histogram_observe(var, left->ld);
 	}
+
+	amtail_vm_free_tempop(left);
+
+	/* RUN terminates expression evaluation; keep stack isolated per expression. */
+	amtail_vm_stack_clear(amt_thread);
 }
 // TODO end
 
@@ -1512,20 +1577,19 @@ uint64_t amtail_branch_select(amtail_thread *amt_thread, amtail_bytecode *byte_c
 	if (byte_ops->re_match)
 		return amtail_vmfunc_branch(amt_thread, byte_ops, variables, logline, offset, line_size, amtail_ll);
 
-	if (amtail_vm_branch_condition_true(amt_thread, byte_ops, variables))
-		return 0;
-
-	uint64_t i = opindex + 1;
-	while (i < byte_code->l && byte_code->ops[i].opcode != AMTAIL_AST_OPCODE_NOOP)
-		++i;
-	while (i < byte_code->l && byte_code->ops[i].opcode == AMTAIL_AST_OPCODE_NOOP)
-		++i;
-	if (i < byte_code->l)
-		return i - 1;
-
-	return byte_ops->right_opcounter;
-
-	//return
+	/*
+	 * Non-regex branches (e.g. `if (lhs OP rhs) { ... }`):
+	 * - If condition is true, fall through to LEFT subtree (body).
+	 * - If false, jump to `right_opcounter`, which the code generator set
+	 *   to the last opcode of LEFT subtree (so main loop's `++i` lands on
+	 *   the first opcode of RIGHT subtree, i.e. the next sibling stmt).
+	 *
+	 * This relies on the parser producing a well-formed AST where the
+	 * block body hangs off BRANCH.LEFT and subsequent siblings are on
+	 * BRANCH.RIGHT (see parser.c `}` handler).
+	 */
+	int cond = amtail_vm_branch_condition_true(amt_thread, byte_ops, variables);
+	return cond ? 0 : byte_ops->right_opcounter;
 }
 
 int amtail_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)

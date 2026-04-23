@@ -121,6 +121,9 @@ static int run_mtail_script_with_log(const char *script_path, const char *log_pa
 		return 1;
 	}
 
+	if (getenv("AMTAIL_DUMP"))
+		amtail_bytecode_dump(byte_code);
+
 	alligator_ht *variables = amtail_variables_init();
 	if (!variables)
 	{
@@ -475,9 +478,9 @@ static int vm_runtime_test_len_strtol(void)
 		runtime_bc_free(bc);
 	}
 
-	/* strtol("42") -> 42 */
+	/* strtol("42", 10) -> 42 */
 	{
-		amtail_bytecode *bc = runtime_bc_new(5);
+		amtail_bytecode *bc = runtime_bc_new(6);
 		bc->ops[0].opcode = AMTAIL_AST_OPCODE_VARIABLE;
 		bc->ops[0].vartype = ALLIGATOR_VARTYPE_COUNTER;
 		bc->ops[0].export_name = string_init_dup("ival");
@@ -485,10 +488,13 @@ static int vm_runtime_test_len_strtol(void)
 		bc->ops[1].export_name = string_init_dup("ival");
 		bc->ops[2].opcode = AMTAIL_AST_OPCODE_VAR;
 		bc->ops[2].export_name = string_init_dup("numtxt");
-		bc->ops[3].opcode = AMTAIL_AST_OPCODE_FUNC_STRTOL;
-		bc->ops[4].opcode = AMTAIL_AST_OPCODE_RUN;
+		bc->ops[3].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[3].export_name = string_init_dup("base10");
+		bc->ops[4].opcode = AMTAIL_AST_OPCODE_FUNC_STRTOL;
+		bc->ops[5].opcode = AMTAIL_AST_OPCODE_RUN;
 		alligator_ht *variables = amtail_variables_init();
 		runtime_insert_text(variables, "numtxt", "42");
+		runtime_insert_text(variables, "base10", "10");
 		string *line = string_init_dup("x\n");
 		ok = ok && amtail_run(bc, variables, line, amtail_ll) && runtime_expect_counter(variables, "ival", 42);
 		amtail_variables_free(variables);
@@ -552,7 +558,6 @@ static int vm_runtime_test_strptime_and_match(void)
 		ok = ok && amtail_run(bc, variables, line, amtail_ll) &&
 		     runtime_expect_counter(variables, "m", 1) &&
 		     runtime_expect_counter(variables, "nm", 1);
-		amtail_variables_free(variables);
 		string_free(line);
 		runtime_bc_free(bc);
 		amtail_variables_free(variables);

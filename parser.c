@@ -364,13 +364,18 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 			}
 		}
 
-		amtail_ast_stack_push(stack, cur);
+		/* Do NOT push on the parser's block-matching stack: this stack
+		 * is used exclusively to match '{' with '}'. Expression nodes
+		 * are LEFT-chained into the tree and do not need stack tracking.
+		 * Pushing them here would leave them on top of the enclosing
+		 * BRANCH, so `}` would pop the wrong node and corrupt the tree
+		 * (sibling statements would end up nested in expression LEFT
+		 * subtrees, causing wrong BRANCH right_opcounter jumps). */
 		cur->stem = amtail_ast_multi_init(2);
 		cur = cur->stem[AMTAIL_AST_LEFT];
 	}
 
 	cur->opcode = AMTAIL_AST_OPCODE_RUN;
-	amtail_ast_stack_push(stack, cur);
 	cur->stem = amtail_ast_multi_init(2);
 	cur = cur->stem[AMTAIL_AST_LEFT];
 	*ccur = cur;
@@ -699,7 +704,10 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 
 			cur->opcode = AMTAIL_AST_OPCODE_ASSIGN;
 			cur->name = lhs;
-			amtail_ast_stack_push(stack, cur);
+			/* Do NOT push on the parser's block-matching stack. Only
+			 * '{' pushes (BRANCH) and '}' pops. ASSIGN lives in the
+			 * tree as the parent of its expression LEFT subtree; the
+			 * stack must remain reserved for block matching. */
 			cur->stem = amtail_ast_multi_init(2);
 			cur = cur->stem[AMTAIL_AST_LEFT];
 
