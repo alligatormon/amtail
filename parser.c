@@ -338,6 +338,14 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 				cur->opcode = AMTAIL_AST_OPCODE_ADD;
 			else if (*expr == '-')
 				cur->opcode = AMTAIL_AST_OPCODE_SUB;
+			else if (!strcmp(expr, "int"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_INT;
+			else if (!strcmp(expr, "float"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_FLOAT;
+			else if (!strcmp(expr, "string"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_STRING;
+			else if (!strcmp(expr, "strtol"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_STRTOL;
 			else
 			{
 				cur->opcode = AMTAIL_AST_OPCODE_VAR;
@@ -710,6 +718,44 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 
 		if (pstate.expression && calculation_expr)
 		{
+			if (!strcmp(t, "int") || !strcmp(t, "float") || !strcmp(t, "string"))
+			{
+				if (i + 3 < tokens->l &&
+				    !strcmp(tokens->str[i + 1]->s, "(") &&
+				    strcmp(tokens->str[i + 2]->s, ")") &&
+				    !strcmp(tokens->str[i + 3]->s, ")"))
+				{
+					calculation_push_queue(calculation_expr, tokens->str[i + 2]->s, tokens->str[i + 2]->l);
+					calculation_push_queue(calculation_expr, tok->s, tok->l);
+					i += 3;
+					last_token = tok;
+					continue;
+				}
+			}
+
+			if (!strcmp(t, "strtol"))
+			{
+				if (i + 4 < tokens->l &&
+				    !strcmp(tokens->str[i + 1]->s, "(") &&
+				    strcmp(tokens->str[i + 2]->s, ")") &&
+				    strcmp(tokens->str[i + 3]->s, ")") &&
+				    !strcmp(tokens->str[i + 4]->s, ")"))
+				{
+					calculation_push_queue(calculation_expr, tokens->str[i + 2]->s, tokens->str[i + 2]->l);
+					calculation_push_queue(calculation_expr, tokens->str[i + 3]->s, tokens->str[i + 3]->l);
+					calculation_push_queue(calculation_expr, tok->s, tok->l);
+					i += 4;
+					last_token = tok;
+					continue;
+				}
+			}
+
+			if (!strcmp(t, "(") || !strcmp(t, ")"))
+			{
+				last_token = tok;
+				continue;
+			}
+
 			if (is_calculation_op(t[0]) && t[1] == '\0')
 			{
 				char curop = calculation_op[(uint8_t)t[0]];

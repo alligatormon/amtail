@@ -1,0 +1,14 @@
+counter master_service_process_avail_total by component
+counter master_service_process_count_total by component
+
+/^store\s+\SVC.Master\.Service\.(?P<component>[A-Za-z0-9\-]+)\.(?P<metric>ProcessAvail|ProcessCount)\s+(?P<value>[0-9]+)\s+[0-9]+$/ {
+  v = int($value)
+
+  if ($metric == "ProcessAvail") {
+    master_service_process_avail_total[$component] = v
+  }
+
+  if ($metric == "ProcessCount") {
+    master_service_process_count_total[$component] = v
+  }
+}

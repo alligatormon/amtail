@@ -11,6 +11,8 @@
 
 void (*amtail_vmfunc[256])(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll);
 void amtail_vmstack_push(amtail_thread *amt_thread, amtail_byteop *byte_ops);
+static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables);
+static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *variables);
 
 static void amtail_vm_set_capture_variable(alligator_ht *variables, const char *name, const char *value, size_t value_len)
 {
@@ -199,6 +201,190 @@ static void amtail_vm_push_bool(amtail_thread *amt_thread, int value)
 
 	new->vartype = ALLIGATOR_VARTYPE_COUNTER;
 	new->li = value ? 1 : 0;
+}
+
+static int amtail_vm_compare_equal(amtail_byteop *left, amtail_byteop *right, alligator_ht *variables)
+{
+	double l = 0, r = 0;
+	if (amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r))
+		return l == r;
+
+	char *ls = amtail_vm_resolve_string(left, variables);
+	char *rs = amtail_vm_resolve_string(right, variables);
+	if (!ls || !rs)
+	{
+		free(ls);
+		free(rs);
+		return 0;
+	}
+
+	int eq = strcmp(ls, rs) == 0;
+	free(ls);
+	free(rs);
+	return eq;
+}
+
+static int amtail_vm_extract_binary_operands(const char *expr, char **lhs, char **rhs)
+{
+	if (!expr || !lhs || !rhs)
+		return 0;
+
+	*lhs = NULL;
+	*rhs = NULL;
+
+	const char *p = expr;
+	while (*p == ' ' || *p == '\t')
+		++p;
+	if (!*p)
+		return 0;
+
+	int in_quote = 0;
+	char quote = '\0';
+	const char *split = NULL;
+	for (const char *it = p; *it; ++it)
+	{
+		if ((*it == '"' || *it == '\'') && (!in_quote || *it == quote))
+		{
+			if (!in_quote)
+			{
+				in_quote = 1;
+				quote = *it;
+			}
+			else
+			{
+				in_quote = 0;
+				quote = '\0';
+			}
+		}
+		else if (!in_quote && (*it == ' ' || *it == '\t'))
+		{
+			split = it;
+			break;
+		}
+	}
+
+	if (!split)
+		return 0;
+
+	const char *rhs_start = split;
+	while (*rhs_start == ' ' || *rhs_start == '\t')
+		++rhs_start;
+
+	size_t lhs_len = (size_t)(split - p);
+	while (lhs_len && (p[lhs_len - 1] == ' ' || p[lhs_len - 1] == '\t'))
+		--lhs_len;
+
+	if (!lhs_len || !*rhs_start)
+		return 0;
+
+	*lhs = strndup(p, lhs_len);
+	*rhs = strdup(rhs_start);
+	if (!*lhs || !*rhs)
+	{
+		free(*lhs);
+		free(*rhs);
+		*lhs = NULL;
+		*rhs = NULL;
+		return 0;
+	}
+
+	return 1;
+}
+
+static int amtail_vm_token_to_number(const char *token, alligator_ht *variables, double *out)
+{
+	if (!token || !out)
+		return 0;
+
+	char *end = NULL;
+	double num = strtod(token, &end);
+	if (end && *end == '\0')
+	{
+		*out = num;
+		return 1;
+	}
+
+	char *resolved = amtail_vm_lookup_variable_string(token, variables);
+	if (!resolved)
+		return 0;
+	end = NULL;
+	num = strtod(resolved, &end);
+	free(resolved);
+	if (!end || *end != '\0')
+		return 0;
+
+	*out = num;
+	return 1;
+}
+
+static char* amtail_vm_token_to_string(const char *token, alligator_ht *variables)
+{
+	if (!token)
+		return NULL;
+
+	size_t len = strlen(token);
+	if (len >= 2 &&
+	    ((token[0] == '"' && token[len - 1] == '"') ||
+	     (token[0] == '\'' && token[len - 1] == '\'')))
+		return strndup(token + 1, len - 2);
+
+	char *resolved = amtail_vm_lookup_variable_string(token, variables);
+	if (resolved)
+		return resolved;
+
+	return strdup(token);
+}
+
+static int amtail_vm_cast_to_int64(amtail_byteop *val, alligator_ht *variables, int64_t *out)
+{
+	if (!val || !out)
+		return 0;
+
+	double num = 0;
+	if (amtail_vm_get_number(val, &num))
+	{
+		*out = (int64_t)num;
+		return 1;
+	}
+
+	char *s = amtail_vm_resolve_string(val, variables);
+	if (!s)
+		return 0;
+
+	char *end = NULL;
+	long long parsed = strtoll(s, &end, 10);
+	free(s);
+	if (!end || *end != '\0')
+		return 0;
+
+	*out = (int64_t)parsed;
+	return 1;
+}
+
+static int amtail_vm_cast_to_double(amtail_byteop *val, alligator_ht *variables, double *out)
+{
+	if (!val || !out)
+		return 0;
+
+	double num = 0;
+	if (amtail_vm_get_number(val, &num))
+	{
+		*out = num;
+		return 1;
+	}
+
+	char *s = amtail_vm_resolve_string(val, variables);
+	if (!s)
+		return 0;
+
+	char *end = NULL;
+	double parsed = strtod(s, &end);
+	free(s);
+	if (!end || *end != '\0')
+		return 0;
+
+	*out = parsed;
+	return 1;
 }
 
 static char* amtail_vm_strdup_trim_quotes(const char *src)
@@ -490,10 +676,49 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		resolved->ld = byte_ops->ld;
 }
 
-uint64_t amtail_vmfunc_branch(amtail_byteop *byte_ops, alligator_ht *variables, string *logline, uint64_t offset, uint64_t line_size, amtail_log_level amtail_ll)
+static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables)
 {
-	if (!byte_ops || !byte_ops->re_match || !logline || !logline->s)
-		return byte_ops ? byte_ops->right_opcounter : 0;
+	if (!byte_ops)
+		return 0;
+
+	char *lhs = NULL, *rhs = NULL;
+	if (byte_ops->export_name && byte_ops->export_name->s &&
+	    amtail_vm_extract_binary_operands(byte_ops->export_name->s, &lhs, &rhs))
+	{
+		double ln = 0, rn = 0;
+		int matched = 0;
+		if (amtail_vm_token_to_number(lhs, variables, &ln) &&
+		    amtail_vm_token_to_number(rhs, variables, &rn))
+			matched = (ln == rn);
+		else
+		{
+			char *ls = amtail_vm_token_to_string(lhs, variables);
+			char *rs = amtail_vm_token_to_string(rhs, variables);
+			matched = (ls && rs && strcmp(ls, rs) == 0);
+			free(ls);
+			free(rs);
+		}
+		free(lhs);
+		free(rhs);
+		return matched;
+	}
+
+	amtail_byteop *cond = amtail_vmstack_pop(amt_thread);
+	if (!cond)
+		return 0;
+	double num = 0;
+	if (amtail_vm_get_number(cond, &num))
+		return num != 0;
+	return 0;
+}
+
+uint64_t amtail_vmfunc_branch(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, uint64_t offset, uint64_t line_size, amtail_log_level amtail_ll)
+{
+	if (!byte_ops)
+		return 0;
+
+	if (!byte_ops->re_match)
+		return amtail_vm_branch_condition_true(amt_thread, byte_ops, variables) ? 0 : byte_ops->right_opcounter;
 
 	uint8_t match = amtail_regex_exec(byte_ops->re_match, logline->s+offset, line_size, amtail_ll);
 	if (match)
@@ -723,18 +948,76 @@ void amtail_vmfunc_cmp_ge(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 
 void amtail_vmfunc_cmp_eq(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
+	char *lhs = NULL, *rhs = NULL;
+	if (byte_ops && byte_ops->export_name && byte_ops->export_name->s &&
+	    amtail_vm_extract_binary_operands(byte_ops->export_name->s, &lhs, &rhs))
+	{
+		double ln = 0, rn = 0;
+		int result = 0;
+		if (amtail_vm_token_to_number(lhs, variables, &ln) && amtail_vm_token_to_number(rhs, variables, &rn))
+		{
+			result = ln == rn;
+		}
+		else
+		{
+			char *ls = amtail_vm_token_to_string(lhs, variables);
+			char *rs = amtail_vm_token_to_string(rhs, variables);
+			result = (ls && rs && strcmp(ls, rs) == 0);
+			free(ls);
+			free(rs);
+		}
+		free(lhs);
+		free(rhs);
+		amtail_vm_push_bool(amt_thread, result);
+		return;
+	}
+
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
-	double l = 0, r = 0;
-	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l == r);
+	if (left && right)
+	{
+		amtail_vm_push_bool(amt_thread, amtail_vm_compare_equal(left, right, variables));
+		return;
+	}
+
+	amtail_vm_push_bool(amt_thread, 0);
 }
 
 void amtail_vmfunc_cmp_ne(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
+	char *lhs = NULL, *rhs = NULL;
+	if (byte_ops && byte_ops->export_name && byte_ops->export_name->s &&
+	    amtail_vm_extract_binary_operands(byte_ops->export_name->s, &lhs, &rhs))
+	{
+		double ln = 0, rn = 0;
+		int result = 1;
+		if (amtail_vm_token_to_number(lhs, variables, &ln) && amtail_vm_token_to_number(rhs, variables, &rn))
+		{
+			result = ln != rn;
+		}
+		else
+		{
+			char *ls = amtail_vm_token_to_string(lhs, variables);
+			char *rs = amtail_vm_token_to_string(rhs, variables);
+			result = !(ls && rs && strcmp(ls, rs) == 0);
+			free(ls);
+			free(rs);
+		}
+		free(lhs);
+		free(rhs);
+		amtail_vm_push_bool(amt_thread, result);
+		return;
+	}
+
 	amtail_byteop *right = amtail_vmstack_pop(amt_thread);
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
-	double l = 0, r = 0;
-	amtail_vm_push_bool(amt_thread, left && right && amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r) && l != r);
+	if (left && right)
+	{
+		amtail_vm_push_bool(amt_thread, !amtail_vm_compare_equal(left, right, variables));
+		return;
+	}
+
+	amtail_vm_push_bool(amt_thread, 1);
 }
 
 void amtail_vmfunc_logic_and(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
@@ -790,15 +1073,16 @@ void amtail_vmfunc_cast_int(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
 	if (!val)
 		return;
-	double v = 0;
-	if (!amtail_vm_get_number(val, &v))
+
+	int64_t iv = 0;
+	if (!amtail_vm_cast_to_int64(val, variables, &iv))
 		return;
 
 	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
 	if (!new)
 		return;
 	new->vartype = ALLIGATOR_VARTYPE_COUNTER;
-	new->li = (int64_t)v;
+	new->li = iv;
 }
 
 void amtail_vmfunc_cast_float(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
@@ -807,7 +1091,7 @@ void amtail_vmfunc_cast_float(amtail_thread *amt_thread, amtail_byteop *byte_ops
 	if (!val)
 		return;
 	double v = 0;
-	if (!amtail_vm_get_number(val, &v))
+	if (!amtail_vm_cast_to_double(val, variables, &v))
 		return;
 
 	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
@@ -829,7 +1113,7 @@ void amtail_vmfunc_cast_bool(amtail_thread *amt_thread, amtail_byteop *byte_ops,
 	amtail_vm_push_bool(amt_thread, v != 0);
 }
 
-void amtail_vmfunc_fn_strtol(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
+void amtail_vmfunc_cast_string(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
 	if (!val)
@@ -839,11 +1123,34 @@ void amtail_vmfunc_fn_strtol(amtail_thread *amt_thread, amtail_byteop *byte_ops,
 	if (!s)
 		return;
 
+	amtail_vm_push_text(amt_thread, s);
+	free(s);
+}
+
+void amtail_vmfunc_fn_strtol(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
+{
+	amtail_byteop *base_op = amtail_vmstack_pop(amt_thread);
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	if (!val)
+		return;
+
+	int64_t base = 10;
+	if (base_op)
+	{
+		int64_t parsed_base = 0;
+		if (amtail_vm_cast_to_int64(base_op, variables, &parsed_base) && parsed_base >= 2 && parsed_base <= 36)
+			base = parsed_base;
+	}
+
+	char *s = amtail_vm_resolve_string(val, variables);
+	if (!s)
+		return;
+
 	char *end = NULL;
-	long long n = strtoll(s, &end, 10);
+	long long n = strtoll(s, &end, (int)base);
 	free(s);
 
-	if (!end)
+	if (!end || *end != '\0')
 		return;
 
 	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
@@ -1163,7 +1470,7 @@ void amtail_vm_init()
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_INT] = amtail_vmfunc_cast_int;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_BOOL] = amtail_vmfunc_cast_bool;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_FLOAT] = amtail_vmfunc_cast_float;
-	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_STRING] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_STRING] = amtail_vmfunc_cast_string;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_SUBST] = amtail_vmfunc_noop;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_ASSIGN] = amtail_vmfunc_assign;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_VAR] = amtail_vmfunc_var_use;
@@ -1199,12 +1506,24 @@ int amtail_pre_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 	return 1;
 }
 
-uint64_t amtail_branch_select(amtail_byteop *byte_ops, alligator_ht *variables, string *logline, uint64_t offset, uint64_t line_size, amtail_log_level amtail_ll)
+uint64_t amtail_branch_select(amtail_thread *amt_thread, amtail_bytecode *byte_code, uint64_t opindex, alligator_ht *variables, string *logline, uint64_t offset, uint64_t line_size, amtail_log_level amtail_ll)
 {
-	//if 
-	//	(byte_ops->opcode == AMTAIL_AST_OPCODE_BRANCH)
-	
-		return amtail_vmfunc_branch(byte_ops, variables, logline, offset, line_size, amtail_ll);
+	amtail_byteop *byte_ops = &byte_code->ops[opindex];
+	if (byte_ops->re_match)
+		return amtail_vmfunc_branch(amt_thread, byte_ops, variables, logline, offset, line_size, amtail_ll);
+
+	if (amtail_vm_branch_condition_true(amt_thread, byte_ops, variables))
+		return 0;
+
+	uint64_t i = opindex + 1;
+	while (i < byte_code->l && byte_code->ops[i].opcode != AMTAIL_AST_OPCODE_NOOP)
+		++i;
+	while (i < byte_code->l && byte_code->ops[i].opcode == AMTAIL_AST_OPCODE_NOOP)
+		++i;
+	if (i < byte_code->l)
+		return i - 1;
+
+	return byte_ops->right_opcounter;
 
 	//return
 }
@@ -1341,7 +1660,7 @@ int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logl
 			rc = amtail_execute(amt_thread, &byte_ops[i], variables, logline, amtail_ll);
 			if (rc == 2) // branch
 			{
-				uint64_t new = amtail_branch_select(&byte_ops[i], variables, logline, cursym_log, line_size, amtail_ll);
+				uint64_t new = amtail_branch_select(amt_thread, byte_code, i, variables, logline, cursym_log, line_size, amtail_ll);
 				if (new)
 					i = new;
 			}
