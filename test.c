@@ -431,24 +431,313 @@ static int runtime_expect_gauge_positive(alligator_ht *variables, const char *na
 	return var && var->type == ALLIGATOR_VARTYPE_GAUGE && var->d > 0;
 }
 
+static int runtime_expect_gauge_equal(alligator_ht *variables, const char *name, double expect)
+{
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, name, amtail_hash((char*)name, strlen(name)));
+	return var && var->type == ALLIGATOR_VARTYPE_GAUGE && var->d == expect;
+}
+
+static int runtime_expect_text(alligator_ht *variables, const char *name, const char *expect)
+{
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, name, amtail_hash((char*)name, strlen(name)));
+	return var && var->type == ALLIGATOR_VARTYPE_TEXT && var->s && var->s->s && strcmp(var->s->s, expect) == 0;
+}
+
 static int vm_runtime_test_timestamp(void)
+{
+	/* Per mtail spec: timestamp() is undefined without a prior settime/strptime,
+	 * and reflects the register afterwards. Verify both properties. */
+	amtail_log_level amtail_ll = {0};
+	int ok = 1;
+
+	/* Case A: no settime -> register unset -> timestamp() returns 0.0 */
+	{
+		amtail_bytecode *bc = runtime_bc_new(4);
+		bc->ops[0].opcode = AMTAIL_AST_OPCODE_VARIABLE;
+		bc->ops[0].vartype = ALLIGATOR_VARTYPE_GAUGE;
+		bc->ops[0].export_name = string_init_dup("ts_empty");
+		bc->ops[1].opcode = AMTAIL_AST_OPCODE_ASSIGN;
+		bc->ops[1].export_name = string_init_dup("ts_empty");
+		bc->ops[2].opcode = AMTAIL_AST_OPCODE_FUNC_TIMESTAMP;
+		bc->ops[3].opcode = AMTAIL_AST_OPCODE_RUN;
+		alligator_ht *variables = amtail_variables_init();
+		string *line = string_init_dup("x\n");
+		ok = ok && amtail_run(bc, variables, line, amtail_ll) &&
+		     runtime_expect_gauge_equal(variables, "ts_empty", 0.0);
+		string_free(line);
+		amtail_variables_free(variables);
+		runtime_bc_free(bc);
+	}
+
+	/* Case B: settime(12345) then timestamp() reflects the register. */
+	{
+		amtail_bytecode *bc = runtime_bc_new(9);
+		/* settime(12345) - swallow the value it pushes into a temp gauge. */
+		bc->ops[0].opcode = AMTAIL_AST_OPCODE_VARIABLE;
+		bc->ops[0].vartype = ALLIGATOR_VARTYPE_GAUGE;
+		bc->ops[0].export_name = string_init_dup("ts_sink");
+		bc->ops[1].opcode = AMTAIL_AST_OPCODE_ASSIGN;
+		bc->ops[1].export_name = string_init_dup("ts_sink");
+		bc->ops[2].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[2].export_name = string_init_dup("epoch");
+		bc->ops[3].opcode = AMTAIL_AST_OPCODE_FUNC_SETTIME;
+		bc->ops[4].opcode = AMTAIL_AST_OPCODE_RUN;
+		/* ts = timestamp() */
+		bc->ops[5].opcode = AMTAIL_AST_OPCODE_VARIABLE;
+		bc->ops[5].vartype = ALLIGATOR_VARTYPE_GAUGE;
+		bc->ops[5].export_name = string_init_dup("ts_set");
+		bc->ops[6].opcode = AMTAIL_AST_OPCODE_ASSIGN;
+		bc->ops[6].export_name = string_init_dup("ts_set");
+		bc->ops[7].opcode = AMTAIL_AST_OPCODE_FUNC_TIMESTAMP;
+		bc->ops[8].opcode = AMTAIL_AST_OPCODE_RUN;
+		alligator_ht *variables = amtail_variables_init();
+		runtime_insert_text(variables, "epoch", "12345");
+		string *line = string_init_dup("x\n");
+		ok = ok && amtail_run(bc, variables, line, amtail_ll) &&
+		     runtime_expect_gauge_equal(variables, "ts_set", 12345.0);
+		string_free(line);
+		amtail_variables_free(variables);
+		runtime_bc_free(bc);
+	}
+
+	return ok;
+}
+
+static int vm_runtime_test_tolower(void)
+{
+	amtail_log_level amtail_ll = {0};
+	amtail_bytecode *bc = runtime_bc_new(5);
+	bc->ops[0].opcode = AMTAIL_AST_OPCODE_VARIABLE;
+	bc->ops[0].vartype = ALLIGATOR_VARTYPE_TEXT;
+	bc->ops[0].export_name = string_init_dup("lowered");
+	bc->ops[1].opcode = AMTAIL_AST_OPCODE_ASSIGN;
+	bc->ops[1].export_name = string_init_dup("lowered");
+	bc->ops[2].opcode = AMTAIL_AST_OPCODE_VAR;
+	bc->ops[2].export_name = string_init_dup("Mixed");
+	bc->ops[3].opcode = AMTAIL_AST_OPCODE_FUNC_TOLOWER;
+	bc->ops[4].opcode = AMTAIL_AST_OPCODE_RUN;
+	alligator_ht *variables = amtail_variables_init();
+	runtime_insert_text(variables, "Mixed", "Hello WORLD 42!");
+	string *line = string_init_dup("x\n");
+	int ok = amtail_run(bc, variables, line, amtail_ll) &&
+	         runtime_expect_text(variables, "lowered", "hello world 42!");
+	string_free(line);
+	amtail_variables_free(variables);
+	runtime_bc_free(bc);
+	return ok;
+}
+
+static int vm_runtime_test_getfilename(void)
 {
 	amtail_log_level amtail_ll = {0};
 	amtail_bytecode *bc = runtime_bc_new(4);
 	bc->ops[0].opcode = AMTAIL_AST_OPCODE_VARIABLE;
-	bc->ops[0].vartype = ALLIGATOR_VARTYPE_GAUGE;
-	bc->ops[0].export_name = string_init_dup("ts");
+	bc->ops[0].vartype = ALLIGATOR_VARTYPE_TEXT;
+	bc->ops[0].export_name = string_init_dup("fname");
 	bc->ops[1].opcode = AMTAIL_AST_OPCODE_ASSIGN;
-	bc->ops[1].export_name = string_init_dup("ts");
-	bc->ops[2].opcode = AMTAIL_AST_OPCODE_FUNC_TIMESTAMP;
+	bc->ops[1].export_name = string_init_dup("fname");
+	bc->ops[2].opcode = AMTAIL_AST_OPCODE_FUNC_GETFILENAME;
 	bc->ops[3].opcode = AMTAIL_AST_OPCODE_RUN;
 	alligator_ht *variables = amtail_variables_init();
 	string *line = string_init_dup("x\n");
-	int rc = amtail_run(bc, variables, line, amtail_ll);
-	int ok = rc && runtime_expect_gauge_positive(variables, "ts");
+	int ok = amtail_run_file(bc, variables, line, "/var/log/syslog", amtail_ll) &&
+	         runtime_expect_text(variables, "fname", "/var/log/syslog");
 	string_free(line);
 	amtail_variables_free(variables);
 	runtime_bc_free(bc);
+	return ok;
+}
+
+static int vm_runtime_test_subst(void)
+{
+	amtail_log_level amtail_ll = {0};
+	int ok = 1;
+
+	/* String form: subst("foo", "bar", "a foo and a foo") -> "a bar and a bar" */
+	{
+		amtail_bytecode *bc = runtime_bc_new(7);
+		bc->ops[0].opcode = AMTAIL_AST_OPCODE_VARIABLE;
+		bc->ops[0].vartype = ALLIGATOR_VARTYPE_TEXT;
+		bc->ops[0].export_name = string_init_dup("out");
+		bc->ops[1].opcode = AMTAIL_AST_OPCODE_ASSIGN;
+		bc->ops[1].export_name = string_init_dup("out");
+		bc->ops[2].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[2].export_name = string_init_dup("old_s");
+		bc->ops[3].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[3].export_name = string_init_dup("new_s");
+		bc->ops[4].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[4].export_name = string_init_dup("val_s");
+		bc->ops[5].opcode = AMTAIL_AST_OPCODE_FUNC_SUBST;
+		bc->ops[6].opcode = AMTAIL_AST_OPCODE_RUN;
+		alligator_ht *variables = amtail_variables_init();
+		runtime_insert_text(variables, "old_s", "foo");
+		runtime_insert_text(variables, "new_s", "bar");
+		runtime_insert_text(variables, "val_s", "a foo and a foo");
+		string *line = string_init_dup("x\n");
+		ok = ok && amtail_run(bc, variables, line, amtail_ll) &&
+		     runtime_expect_text(variables, "out", "a bar and a bar");
+		string_free(line);
+		amtail_variables_free(variables);
+		runtime_bc_free(bc);
+	}
+
+	/* Regex form: subst("/[a-z]+/", "X", "abc 123 def") -> "X 123 X" */
+	{
+		amtail_bytecode *bc = runtime_bc_new(7);
+		bc->ops[0].opcode = AMTAIL_AST_OPCODE_VARIABLE;
+		bc->ops[0].vartype = ALLIGATOR_VARTYPE_TEXT;
+		bc->ops[0].export_name = string_init_dup("out_r");
+		bc->ops[1].opcode = AMTAIL_AST_OPCODE_ASSIGN;
+		bc->ops[1].export_name = string_init_dup("out_r");
+		bc->ops[2].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[2].export_name = string_init_dup("pat");
+		bc->ops[3].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[3].export_name = string_init_dup("rep");
+		bc->ops[4].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[4].export_name = string_init_dup("src");
+		bc->ops[5].opcode = AMTAIL_AST_OPCODE_FUNC_SUBST;
+		bc->ops[6].opcode = AMTAIL_AST_OPCODE_RUN;
+		alligator_ht *variables = amtail_variables_init();
+		runtime_insert_text(variables, "pat", "/[a-z]+/");
+		runtime_insert_text(variables, "rep", "X");
+		runtime_insert_text(variables, "src", "abc 123 def");
+		string *line = string_init_dup("x\n");
+		ok = ok && amtail_run(bc, variables, line, amtail_ll) &&
+		     runtime_expect_text(variables, "out_r", "X 123 X");
+		string_free(line);
+		amtail_variables_free(variables);
+		runtime_bc_free(bc);
+	}
+
+	return ok;
+}
+
+static int vm_runtime_test_settime_strptime(void)
+{
+	amtail_log_level amtail_ll = {0};
+	int ok = 1;
+
+	/* strptime with Go-style format: "2024-03-28 14:15:16" + "2006-01-02 15:04:05" */
+	{
+		amtail_bytecode *bc = runtime_bc_new(11);
+		bc->ops[0].opcode = AMTAIL_AST_OPCODE_VARIABLE;
+		bc->ops[0].vartype = ALLIGATOR_VARTYPE_GAUGE;
+		bc->ops[0].export_name = string_init_dup("parsed_go");
+		bc->ops[1].opcode = AMTAIL_AST_OPCODE_ASSIGN;
+		bc->ops[1].export_name = string_init_dup("parsed_go");
+		bc->ops[2].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[2].export_name = string_init_dup("d_val");
+		bc->ops[3].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[3].export_name = string_init_dup("d_fmt");
+		bc->ops[4].opcode = AMTAIL_AST_OPCODE_FUNC_STRPTIME;
+		bc->ops[5].opcode = AMTAIL_AST_OPCODE_RUN;
+		/* reflect register via timestamp() */
+		bc->ops[6].opcode = AMTAIL_AST_OPCODE_VARIABLE;
+		bc->ops[6].vartype = ALLIGATOR_VARTYPE_GAUGE;
+		bc->ops[6].export_name = string_init_dup("reg_ts");
+		bc->ops[7].opcode = AMTAIL_AST_OPCODE_ASSIGN;
+		bc->ops[7].export_name = string_init_dup("reg_ts");
+		bc->ops[8].opcode = AMTAIL_AST_OPCODE_FUNC_TIMESTAMP;
+		bc->ops[9].opcode = AMTAIL_AST_OPCODE_RUN;
+		bc->ops[10].opcode = AMTAIL_AST_OPCODE_NOOP;
+		alligator_ht *variables = amtail_variables_init();
+		runtime_insert_text(variables, "d_val", "2024-03-28 14:15:16");
+		runtime_insert_text(variables, "d_fmt", "2006-01-02 15:04:05");
+		string *line = string_init_dup("x\n");
+		int rc = amtail_run(bc, variables, line, amtail_ll);
+		ok = ok && rc &&
+		     runtime_expect_gauge_positive(variables, "parsed_go") &&
+		     runtime_expect_gauge_positive(variables, "reg_ts");
+		/* The register should mirror the parsed value. */
+		amtail_variable *a = alligator_ht_search(variables, amtail_variable_compare,
+		                                         "parsed_go",
+		                                         amtail_hash("parsed_go", strlen("parsed_go")));
+		amtail_variable *b = alligator_ht_search(variables, amtail_variable_compare,
+		                                         "reg_ts",
+		                                         amtail_hash("reg_ts", strlen("reg_ts")));
+		ok = ok && a && b && a->d == b->d;
+		string_free(line);
+		amtail_variables_free(variables);
+		runtime_bc_free(bc);
+	}
+
+	/* strftime-style format passes through too: "2024-03-28" + "%Y-%m-%d" */
+	{
+		amtail_bytecode *bc = runtime_bc_new(6);
+		bc->ops[0].opcode = AMTAIL_AST_OPCODE_VARIABLE;
+		bc->ops[0].vartype = ALLIGATOR_VARTYPE_GAUGE;
+		bc->ops[0].export_name = string_init_dup("parsed_pct");
+		bc->ops[1].opcode = AMTAIL_AST_OPCODE_ASSIGN;
+		bc->ops[1].export_name = string_init_dup("parsed_pct");
+		bc->ops[2].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[2].export_name = string_init_dup("d2_val");
+		bc->ops[3].opcode = AMTAIL_AST_OPCODE_VAR;
+		bc->ops[3].export_name = string_init_dup("d2_fmt");
+		bc->ops[4].opcode = AMTAIL_AST_OPCODE_FUNC_STRPTIME;
+		bc->ops[5].opcode = AMTAIL_AST_OPCODE_RUN;
+		alligator_ht *variables = amtail_variables_init();
+		runtime_insert_text(variables, "d2_val", "2024-03-28");
+		runtime_insert_text(variables, "d2_fmt", "%Y-%m-%d");
+		string *line = string_init_dup("x\n");
+		ok = ok && amtail_run(bc, variables, line, amtail_ll) &&
+		     runtime_expect_gauge_positive(variables, "parsed_pct");
+		string_free(line);
+		amtail_variables_free(variables);
+		runtime_bc_free(bc);
+	}
+
+	return ok;
+}
+
+/* Exercise a complete mtail-source script that uses the new functions. */
+static int vm_runtime_test_mtail_source_functions(void)
+{
+	amtail_log_level amtail_ll = {0};
+
+	const char *script_path = "tests/custom_functions.mtail";
+	string *src = string_init_dup((char*)script_path);
+	string_tokens *tokens = amtail_lex(src, (char*)script_path, amtail_ll);
+	if (!tokens)
+	{
+		string_free(src);
+		return 0;
+	}
+	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
+	if (!ast)
+	{
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
+	if (!byte_code)
+	{
+		amtail_ast_free(ast);
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+
+	alligator_ht *variables = amtail_variables_init();
+	runtime_insert_text(variables, "word", "HELLO");
+	runtime_insert_text(variables, "sample", "a foo and a foo");
+	runtime_insert_text(variables, "digits", "42");
+	string *line = string_init_dup("dummy line\n");
+	int rc = amtail_run_file(byte_code, variables, line, "/tmp/fake.log", amtail_ll);
+
+	int ok = rc &&
+	         runtime_expect_counter(variables, "word_len", 5) &&
+	         runtime_expect_counter(variables, "parsed_num", 42) &&
+	         runtime_expect_text(variables, "lowered_word", "hello") &&
+	         runtime_expect_text(variables, "replaced", "a bar and a bar") &&
+	         runtime_expect_text(variables, "logname", "/tmp/fake.log");
+
+	string_free(line);
+	amtail_variables_free(variables);
+	amtail_code_free(byte_code);
+	amtail_ast_free(ast);
+	string_tokens_free(tokens);
+	string_free(src);
 	return ok;
 }
 
@@ -568,13 +857,21 @@ static int vm_runtime_test_strptime_and_match(void)
 
 static int vm_runtime_tests(void)
 {
-	int ok = 1;
 	int rc_timestamp = vm_runtime_test_timestamp();
 	int rc_len_strtol = vm_runtime_test_len_strtol();
 	int rc_strptime_match = vm_runtime_test_strptime_and_match();
-	ok = rc_timestamp && rc_len_strtol && rc_strptime_match;
-	printf("[VM] timestamp=%d len_strtol=%d strptime_match=%d\n",
-	       rc_timestamp, rc_len_strtol, rc_strptime_match);
+	int rc_tolower = vm_runtime_test_tolower();
+	int rc_getfilename = vm_runtime_test_getfilename();
+	int rc_subst = vm_runtime_test_subst();
+	int rc_settime_strptime = vm_runtime_test_settime_strptime();
+	int rc_source = vm_runtime_test_mtail_source_functions();
+	int ok = rc_timestamp && rc_len_strtol && rc_strptime_match &&
+	         rc_tolower && rc_getfilename && rc_subst && rc_settime_strptime &&
+	         rc_source;
+	printf("[VM] timestamp=%d len_strtol=%d strptime_match=%d tolower=%d "
+	       "getfilename=%d subst=%d settime_strptime=%d source=%d\n",
+	       rc_timestamp, rc_len_strtol, rc_strptime_match, rc_tolower,
+	       rc_getfilename, rc_subst, rc_settime_strptime, rc_source);
 	if (!ok)
 		printf("[FAIL][VM] runtime feature tests\n");
 	else

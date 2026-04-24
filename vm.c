@@ -672,7 +672,32 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	}
 	free(resolved_key);
 
-	/* Fallback for inline numeric literals emitted by parser. */
+	/* Fallback for inline literals emitted by parser (numeric or quoted string).
+	 * The parser pushes operand tokens as VAR nodes whose export_name is the raw
+	 * token text; numbers are looked up via byte_ops->li/ld, but for string and
+	 * regex literals we need to strip the surrounding delimiters here so they
+	 * reach function handlers (subst, tolower, strptime, ...) as TEXT values. */
+	if (byte_ops->export_name && byte_ops->export_name->s)
+	{
+		char *s = byte_ops->export_name->s;
+		size_t sl = byte_ops->export_name->l;
+		if (sl >= 2 &&
+		    ((s[0] == '"' && s[sl - 1] == '"') ||
+		     (s[0] == '\'' && s[sl - 1] == '\'')))
+		{
+			resolved->vartype = ALLIGATOR_VARTYPE_TEXT;
+			resolved->ls = string_init_alloc(s + 1, sl - 2);
+			return;
+		}
+		/* /regex/ literal: keep the surrounding slashes so subst can detect it. */
+		if (sl >= 2 && s[0] == '/' && s[sl - 1] == '/')
+		{
+			resolved->vartype = ALLIGATOR_VARTYPE_TEXT;
+			resolved->ls = string_init_alloc(s, sl);
+			return;
+		}
+	}
+
 	resolved->vartype = byte_ops->vartype;
 	if (byte_ops->vartype == ALLIGATOR_VARTYPE_COUNTER)
 		resolved->li = byte_ops->li;
@@ -1235,39 +1260,418 @@ void amtail_vmfunc_fn_tolower(amtail_thread *amt_thread, amtail_byteop *byte_ops
 
 void amtail_vmfunc_fn_timestamp(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
-	struct timespec ts;
-	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
-		return;
-
 	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
 	if (!new)
 		return;
+
 	new->vartype = ALLIGATOR_VARTYPE_GAUGE;
-	new->ld = (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0);
+	/* Per mtail spec: undefined if neither settime/strptime have been called.
+	 * Emit 0 in that case; settime/strptime establish the register. */
+	if (amt_thread && amt_thread->timestamp_set)
+		new->ld = amt_thread->timestamp_value;
+	else
+		new->ld = 0.0;
+}
+
+/* Translate Go time.Parse layout tokens to strptime(3) conversion specs so
+ * callers can keep writing mtail scripts that follow the upstream Go syntax.
+ * We only translate the handful of tokens the Go reference layout uses; any
+ * unknown run is copied verbatim, which also means plain strftime-style specs
+ * (e.g. %Y-%m-%d) pass through untouched. */
+static char* amtail_vm_go_format_to_strptime(const char *go_fmt)
+{
+	if (!go_fmt)
+		return NULL;
+
+	size_t cap = strlen(go_fmt) * 2 + 4;
+	char *out = calloc(1, cap);
+	if (!out)
+		return NULL;
+	size_t oi = 0;
+
+	struct { const char *token; const char *spec; } map[] = {
+		{ "2006", "%Y" },
+		{ "01",   "%m" },
+		{ "02",   "%d" },
+		{ "15",   "%H" },
+		{ "04",   "%M" },
+		{ "05",   "%S" },
+		{ "Jan",  "%b" },
+		{ "Mon",  "%a" },
+		{ "PM",   "%p" },
+	};
+
+	const char *p = go_fmt;
+	while (*p)
+	{
+		int matched = 0;
+		for (size_t i = 0; i < sizeof(map) / sizeof(map[0]); ++i)
+		{
+			size_t tl = strlen(map[i].token);
+			if (!strncmp(p, map[i].token, tl))
+			{
+				size_t sl = strlen(map[i].spec);
+				if (oi + sl + 1 >= cap)
+				{
+					cap = (oi + sl + 1) * 2;
+					out = realloc(out, cap);
+					if (!out)
+						return NULL;
+				}
+				memcpy(out + oi, map[i].spec, sl);
+				oi += sl;
+				p += tl;
+				matched = 1;
+				break;
+			}
+		}
+		if (matched)
+			continue;
+
+		if (oi + 2 >= cap)
+		{
+			cap *= 2;
+			out = realloc(out, cap);
+			if (!out)
+				return NULL;
+		}
+		out[oi++] = *p++;
+	}
+	out[oi] = '\0';
+	return out;
+}
+
+static int amtail_vm_parse_with_format(const char *value, const char *fmt, double *out_epoch)
+{
+	if (!value || !fmt || !out_epoch)
+		return 0;
+
+	char *spec = amtail_vm_go_format_to_strptime(fmt);
+	if (!spec)
+		return 0;
+
+	struct tm tmv;
+	memset(&tmv, 0, sizeof(tmv));
+	char *end = strptime(value, spec, &tmv);
+	free(spec);
+	if (!end)
+		return 0;
+
+	time_t t = mktime(&tmv);
+	if (t < 0)
+		return 0;
+
+	*out_epoch = (double)t;
+	return 1;
 }
 
 void amtail_vmfunc_fn_strptime(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
-	/*
-	 * Parser does not yet preserve full call argument structure.
-	 * For now: parse top stack value as epoch-compatible string/number.
-	 */
-	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
-	if (!val)
+	/* strptime(value, format) - pops 2 args: top is format, below is value.
+	 * If only one arg was pushed, fall back to best-effort epoch parsing so
+	 * legacy call sites keep working. The runcalc boundary marker (ASSIGN)
+	 * stays on the stack, so push it back if we accidentally pop it. */
+	amtail_byteop *fmt_op = amtail_vmstack_pop(amt_thread);
+	if (!fmt_op)
 		return;
+	if (fmt_op->opcode == AMTAIL_AST_OPCODE_ASSIGN)
+	{
+		amtail_vmstack_push(amt_thread, fmt_op);
+		return;
+	}
 
-	char *s = amtail_vm_resolve_string(val, variables);
-	amtail_vm_free_tempop(val);
-	if (!s)
+	amtail_byteop *val_op = amtail_vmstack_pop(amt_thread);
+	if (val_op && val_op->opcode == AMTAIL_AST_OPCODE_ASSIGN)
+	{
+		amtail_vmstack_push(amt_thread, val_op);
+		val_op = NULL;
+	}
+
+	if (!val_op)
+	{
+		val_op = fmt_op;
+		fmt_op = NULL;
+	}
+
+	char *value = amtail_vm_resolve_string(val_op, variables);
+	char *fmt = fmt_op ? amtail_vm_resolve_string(fmt_op, variables) : NULL;
+	amtail_vm_free_tempop(val_op);
+	amtail_vm_free_tempop(fmt_op);
+
+	if (!value)
+	{
+		free(fmt);
 		return;
-	double epoch = amtail_vm_parse_epoch_string(s);
-	free(s);
+	}
+
+	double epoch = 0;
+	int ok = 0;
+	if (fmt && *fmt)
+		ok = amtail_vm_parse_with_format(value, fmt, &epoch);
+	if (!ok)
+		epoch = amtail_vm_parse_epoch_string(value);
+
+	free(value);
+	free(fmt);
+
+	if (amt_thread && epoch > 0)
+	{
+		amt_thread->timestamp_set = 1;
+		amt_thread->timestamp_value = epoch;
+	}
 
 	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
 	if (!new)
 		return;
 	new->vartype = ALLIGATOR_VARTYPE_GAUGE;
 	new->ld = epoch;
+}
+
+void amtail_vmfunc_fn_settime(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
+{
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	if (!val)
+		return;
+	if (val->opcode == AMTAIL_AST_OPCODE_ASSIGN)
+	{
+		amtail_vmstack_push(amt_thread, val);
+		return;
+	}
+
+	double epoch = 0;
+	int ok = amtail_vm_cast_to_double(val, variables, &epoch);
+	if (!ok)
+	{
+		/* Allow "1709999999" style text to flow through. */
+		char *s = amtail_vm_resolve_string(val, variables);
+		if (s)
+		{
+			epoch = amtail_vm_parse_epoch_string(s);
+			ok = epoch != 0;
+			free(s);
+		}
+	}
+	amtail_vm_free_tempop(val);
+
+	if (!ok || !amt_thread)
+		return;
+
+	amt_thread->timestamp_set = 1;
+	amt_thread->timestamp_value = epoch;
+
+	/* settime is an expression statement on the mtail side; emit a placeholder
+	 * gauge value so the surrounding RUN consumes something and the ASSIGN
+	 * marker stays balanced. */
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+	new->vartype = ALLIGATOR_VARTYPE_GAUGE;
+	new->ld = epoch;
+}
+
+void amtail_vmfunc_fn_getfilename(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
+{
+	const char *name = (amt_thread && amt_thread->filename) ? amt_thread->filename : "";
+	amtail_vm_push_text(amt_thread, name);
+}
+
+static char* amtail_vm_string_replace_all(const char *haystack, const char *needle, const char *replacement)
+{
+	if (!haystack)
+		return NULL;
+	if (!needle || !*needle)
+		return strdup(haystack);
+	if (!replacement)
+		replacement = "";
+
+	size_t nlen = strlen(needle);
+	size_t rlen = strlen(replacement);
+
+	size_t cap = strlen(haystack) + 1;
+	char *out = calloc(1, cap);
+	if (!out)
+		return NULL;
+	size_t oi = 0;
+
+	const char *p = haystack;
+	while (*p)
+	{
+		if (!strncmp(p, needle, nlen))
+		{
+			if (oi + rlen + 1 >= cap)
+			{
+				cap = (oi + rlen + 1) * 2;
+				out = realloc(out, cap);
+				if (!out)
+					return NULL;
+			}
+			memcpy(out + oi, replacement, rlen);
+			oi += rlen;
+			p += nlen;
+			continue;
+		}
+
+		if (oi + 2 >= cap)
+		{
+			cap *= 2;
+			out = realloc(out, cap);
+			if (!out)
+				return NULL;
+		}
+		out[oi++] = *p++;
+	}
+	out[oi] = '\0';
+	return out;
+}
+
+static char* amtail_vm_regex_replace_all(const char *haystack, const char *pattern, const char *replacement)
+{
+	if (!haystack || !pattern)
+		return haystack ? strdup(haystack) : NULL;
+	if (!replacement)
+		replacement = "";
+
+	regex_match *rm = amtail_regex_compile((char*)pattern);
+	if (!rm || !rm->regex_compiled)
+	{
+		if (rm)
+			amtail_regex_free(rm);
+		return strdup(haystack);
+	}
+
+	size_t hlen = strlen(haystack);
+	size_t rlen = strlen(replacement);
+	size_t cap = hlen + 1;
+	char *out = calloc(1, cap);
+	if (!out)
+	{
+		amtail_regex_free(rm);
+		return NULL;
+	}
+	size_t oi = 0;
+
+	int offset = 0;
+	int ovector[30];
+	while ((size_t)offset <= hlen)
+	{
+		int rc = pcre_exec(rm->regex_compiled, rm->pcreExtra, haystack,
+		                   (int)hlen, offset, 0, ovector, 30);
+		if (rc < 0)
+			break;
+
+		int mstart = ovector[0];
+		int mend = ovector[1];
+		size_t pre = (size_t)(mstart - offset);
+
+		if (oi + pre + rlen + 2 >= cap)
+		{
+			cap = (oi + pre + rlen + 2) * 2;
+			out = realloc(out, cap);
+			if (!out)
+			{
+				amtail_regex_free(rm);
+				return NULL;
+			}
+		}
+
+		memcpy(out + oi, haystack + offset, pre);
+		oi += pre;
+
+		memcpy(out + oi, replacement, rlen);
+		oi += rlen;
+
+		if (mend == mstart)
+			++offset;
+		else
+			offset = mend;
+	}
+
+	size_t tail = hlen - (size_t)offset;
+	if (oi + tail + 1 >= cap)
+	{
+		cap = oi + tail + 1;
+		out = realloc(out, cap);
+		if (!out)
+		{
+			amtail_regex_free(rm);
+			return NULL;
+		}
+	}
+	memcpy(out + oi, haystack + offset, tail);
+	oi += tail;
+	out[oi] = '\0';
+
+	amtail_regex_free(rm);
+	return out;
+}
+
+/* Pop a function argument while leaving the runcalc ASSIGN boundary marker
+ * in place. Returns NULL if we ran into the marker or the stack is empty. */
+static amtail_byteop* amtail_vm_pop_arg(amtail_thread *amt_thread)
+{
+	amtail_byteop *op = amtail_vmstack_pop(amt_thread);
+	if (!op)
+		return NULL;
+	if (op->opcode == AMTAIL_AST_OPCODE_ASSIGN)
+	{
+		amtail_vmstack_push(amt_thread, op);
+		return NULL;
+	}
+	return op;
+}
+
+void amtail_vmfunc_fn_subst(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
+{
+	/* subst(old, new, val) - args pushed left-to-right so val is on top. */
+	amtail_byteop *val_op = amtail_vm_pop_arg(amt_thread);
+	amtail_byteop *new_op = val_op ? amtail_vm_pop_arg(amt_thread) : NULL;
+	amtail_byteop *old_op = new_op ? amtail_vm_pop_arg(amt_thread) : NULL;
+	if (!val_op || !new_op || !old_op)
+	{
+		amtail_vm_free_tempop(val_op);
+		amtail_vm_free_tempop(new_op);
+		amtail_vm_free_tempop(old_op);
+		return;
+	}
+
+	char *val = amtail_vm_resolve_string(val_op, variables);
+	char *newstr = amtail_vm_resolve_string(new_op, variables);
+	char *oldstr = amtail_vm_resolve_string(old_op, variables);
+	amtail_vm_free_tempop(val_op);
+	amtail_vm_free_tempop(new_op);
+	amtail_vm_free_tempop(old_op);
+
+	if (!val || !newstr || !oldstr)
+	{
+		free(val);
+		free(newstr);
+		free(oldstr);
+		return;
+	}
+
+	size_t ol = strlen(oldstr);
+	int is_regex = (ol >= 2 && oldstr[0] == '/' && oldstr[ol - 1] == '/');
+	char *result = NULL;
+	if (is_regex)
+	{
+		char *pattern = strndup(oldstr + 1, ol - 2);
+		result = amtail_vm_regex_replace_all(val, pattern, newstr);
+		free(pattern);
+	}
+	else
+	{
+		result = amtail_vm_string_replace_all(val, oldstr, newstr);
+	}
+
+	free(val);
+	free(newstr);
+	free(oldstr);
+
+	if (!result)
+		return;
+
+	amtail_vm_push_text(amt_thread, result);
+	free(result);
 }
 
 void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
@@ -1409,6 +1813,15 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE)
 			amtail_histogram_observe(var, left->ld);
 	}
+	else if (var->type == ALLIGATOR_VARTYPE_TEXT && left->vartype == ALLIGATOR_VARTYPE_TEXT &&
+	         left->ls && left->ls->s)
+	{
+		if (var->s)
+			string_free(var->s);
+		var->s = string_string_init_dup(left->ls);
+		if (amtail_ll.vm > 1)
+			fprintf(stderr, "load variable %s/%s: t/t '%s'\n", var->export_name->s, var->key, var->s->s);
+	}
 
 	amtail_vm_free_tempop(left);
 
@@ -1530,13 +1943,13 @@ void amtail_vm_init()
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_TOLOWER] = amtail_vmfunc_fn_tolower;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_LEN] = amtail_vmfunc_fn_len;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_STRTOL] = amtail_vmfunc_fn_strtol;
-	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_SETTIME] = amtail_vmfunc_noop;
-	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_GETFILENAME] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_SETTIME] = amtail_vmfunc_fn_settime;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_GETFILENAME] = amtail_vmfunc_fn_getfilename;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_INT] = amtail_vmfunc_cast_int;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_BOOL] = amtail_vmfunc_cast_bool;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_FLOAT] = amtail_vmfunc_cast_float;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_STRING] = amtail_vmfunc_cast_string;
-	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_SUBST] = amtail_vmfunc_noop;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_SUBST] = amtail_vmfunc_fn_subst;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_ASSIGN] = amtail_vmfunc_assign;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_VAR] = amtail_vmfunc_var_use;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_RUN] = amtail_vmfunc_runcalc;
@@ -1695,7 +2108,7 @@ void amtail_bytecode_dump(amtail_bytecode* byte_code)
 	}
 }
 
-int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, amtail_log_level amtail_ll)
+int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, const char *filename, amtail_log_level amtail_ll)
 {
 	uint64_t size = byte_code->l;
 	amtail_byteop *byte_ops = byte_code->ops;
@@ -1703,6 +2116,7 @@ int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logl
 	uint64_t line_size = 0;
 
 	amtail_thread *amt_thread = amtail_thread_init();
+	amt_thread->filename = filename;
 
 	if (!byte_code->prepared)
 	{
@@ -1718,6 +2132,10 @@ int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logl
 		line_size = strcspn(logline->s + cursym_log, "\n");
 		amt_thread->line_ptr = logline->s + cursym_log;
 		amt_thread->line_size = line_size;
+		/* Per-line reset of the timestamp register: the spec defines it as
+		 * line-scoped (established by settime/strptime during line processing). */
+		amt_thread->timestamp_set = 0;
+		amt_thread->timestamp_value = 0;
 		amtail_vm_stack_clear(amt_thread);
 		for (uint64_t i = 0; i < size; ++i)
 		{
@@ -1731,6 +2149,8 @@ int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logl
 			else if (!rc)
 			{
 				printf("error execute on logline: '%s', %d\n", logline->s, rc);
+				amtail_vm_stack_clear(amt_thread);
+				amtail_thread_free(amt_thread);
 				return rc;
 			}
 		}
@@ -1742,4 +2162,9 @@ int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logl
 	amtail_vm_stack_clear(amt_thread);
 	amtail_thread_free(amt_thread);
 	return 1;
+}
+
+int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, amtail_log_level amtail_ll)
+{
+	return amtail_run_file(byte_code, variables, logline, NULL, amtail_ll);
 }

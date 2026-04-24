@@ -328,15 +328,20 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 			char *expr = calculation_expr->queue[i].svalue->s;
 			uint64_t size = calculation_expr->queue[i].svalue->l;
 			cur->name = string_init_alloc(expr, size);
-			if (*expr == '^')
+
+			/* Single-char arithmetic operators get mapped to opcodes. Longer
+			 * tokens that happen to start with '/' are /regex/ literals or
+			 * multi-char identifiers - do NOT misinterpret them as DIV. */
+			int is_single_op = (size == 1);
+			if (is_single_op && *expr == '^')
 				cur->opcode = AMTAIL_AST_OPCODE_POW;
-			else if (*expr == '*')
+			else if (is_single_op && *expr == '*')
 				cur->opcode = AMTAIL_AST_OPCODE_MUL;
-			else if (*expr == '/')
+			else if (is_single_op && *expr == '/')
 				cur->opcode = AMTAIL_AST_OPCODE_DIV;
-			else if (*expr == '+')
+			else if (is_single_op && *expr == '+')
 				cur->opcode = AMTAIL_AST_OPCODE_ADD;
-			else if (*expr == '-')
+			else if (is_single_op && *expr == '-')
 				cur->opcode = AMTAIL_AST_OPCODE_SUB;
 			else if (!strcmp(expr, "int"))
 				cur->opcode = AMTAIL_AST_OPCODE_FUNC_INT;
@@ -344,14 +349,30 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 				cur->opcode = AMTAIL_AST_OPCODE_FUNC_FLOAT;
 			else if (!strcmp(expr, "string"))
 				cur->opcode = AMTAIL_AST_OPCODE_FUNC_STRING;
+			else if (!strcmp(expr, "bool"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_BOOL;
 			else if (!strcmp(expr, "strtol"))
 				cur->opcode = AMTAIL_AST_OPCODE_FUNC_STRTOL;
+			else if (!strcmp(expr, "len"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_LEN;
+			else if (!strcmp(expr, "tolower"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_TOLOWER;
+			else if (!strcmp(expr, "timestamp"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_TIMESTAMP;
+			else if (!strcmp(expr, "getfilename"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_GETFILENAME;
+			else if (!strcmp(expr, "settime"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_SETTIME;
+			else if (!strcmp(expr, "strptime"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_STRPTIME;
+			else if (!strcmp(expr, "subst"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_SUBST;
 			else
 			{
 				cur->opcode = AMTAIL_AST_OPCODE_VAR;
 
 
-				if (strstr(cur->name->s, ".")) // if float point number
+				if (strstr(cur->name->s, ".") && !(size >= 2 && expr[0] == '/' && expr[size - 1] == '/')) // if float point number
 				{
 					cur->vartype = ALLIGATOR_VARTYPE_GAUGE;
 					cur->dvalue = strtod(cur->name->s, NULL);
@@ -726,7 +747,15 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 
 		if (pstate.expression && calculation_expr)
 		{
-			if (!strcmp(t, "int") || !strcmp(t, "float") || !strcmp(t, "string"))
+			/* Single-arg function calls like `len(x)`, `tolower(x)`,
+			 * `settime(x)`, `int(x)`, `float(x)`, `string(x)`, `bool(x)`.
+			 * Parser emits: [arg, funcname] on the shunting-yard queue so
+			 * VM pops one value and pushes the result. */
+			int is_single_arg_fn = (!strcmp(t, "int") || !strcmp(t, "float") ||
+			                       !strcmp(t, "string") || !strcmp(t, "bool") ||
+			                       !strcmp(t, "len") || !strcmp(t, "tolower") ||
+			                       !strcmp(t, "settime"));
+			if (is_single_arg_fn)
 			{
 				if (i + 3 < tokens->l &&
 				    !strcmp(tokens->str[i + 1]->s, "(") &&
@@ -741,7 +770,10 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 				}
 			}
 
-			if (!strcmp(t, "strtol"))
+			/* Two-arg function calls like `strtol(val, base)` and
+			 * `strptime(value, format)`. */
+			int is_two_arg_fn = (!strcmp(t, "strtol") || !strcmp(t, "strptime"));
+			if (is_two_arg_fn)
 			{
 				if (i + 4 < tokens->l &&
 				    !strcmp(tokens->str[i + 1]->s, "(") &&
@@ -753,6 +785,40 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 					calculation_push_queue(calculation_expr, tokens->str[i + 3]->s, tokens->str[i + 3]->l);
 					calculation_push_queue(calculation_expr, tok->s, tok->l);
 					i += 4;
+					last_token = tok;
+					continue;
+				}
+			}
+
+			/* Three-arg function calls: `subst(old, new, val)`. */
+			if (!strcmp(t, "subst"))
+			{
+				if (i + 5 < tokens->l &&
+				    !strcmp(tokens->str[i + 1]->s, "(") &&
+				    strcmp(tokens->str[i + 2]->s, ")") &&
+				    strcmp(tokens->str[i + 3]->s, ")") &&
+				    strcmp(tokens->str[i + 4]->s, ")") &&
+				    !strcmp(tokens->str[i + 5]->s, ")"))
+				{
+					calculation_push_queue(calculation_expr, tokens->str[i + 2]->s, tokens->str[i + 2]->l);
+					calculation_push_queue(calculation_expr, tokens->str[i + 3]->s, tokens->str[i + 3]->l);
+					calculation_push_queue(calculation_expr, tokens->str[i + 4]->s, tokens->str[i + 4]->l);
+					calculation_push_queue(calculation_expr, tok->s, tok->l);
+					i += 5;
+					last_token = tok;
+					continue;
+				}
+			}
+
+			/* Zero-arg function calls: `timestamp()`, `getfilename()`. */
+			if (!strcmp(t, "timestamp") || !strcmp(t, "getfilename"))
+			{
+				if (i + 2 < tokens->l &&
+				    !strcmp(tokens->str[i + 1]->s, "(") &&
+				    !strcmp(tokens->str[i + 2]->s, ")"))
+				{
+					calculation_push_queue(calculation_expr, tok->s, tok->l);
+					i += 2;
 					last_token = tok;
 					continue;
 				}
