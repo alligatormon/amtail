@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 700
 #include "common/selector.h"
 #include "generator.h"
 #include "amtail_pcre.h"
