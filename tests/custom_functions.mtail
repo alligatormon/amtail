@@ -1,0 +1,23 @@
+# amtail unit-test fixture exercising the newly wired functions:
+# len, tolower, subst (string + regex), strtol, getfilename.
+#
+# The test harness pre-populates `word`, `sample`, and `digits` as hidden
+# text variables, feeds a dummy log line, and checks the outputs below.
+
+hidden text word
+hidden text sample
+hidden text digits
+
+counter word_len
+counter parsed_num
+text lowered_word
+text replaced
+text logname
+
+/./ {
+  word_len = len(word)
+  parsed_num = strtol(digits, 10)
+  lowered_word = tolower(word)
+  replaced = subst("foo", "bar", sample)
+  logname = getfilename()
+}
