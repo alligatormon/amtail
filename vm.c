@@ -1718,7 +1718,9 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, resolved_key, name_hash);
 	if (!var)
 	{
-		uint8_t hidden = 0; // TODO
+		/* Implicit vars created by assignment should be local (hidden)
+		 * unless they map to an explicitly declared metric/template. */
+		uint8_t hidden = 1;
 		uint8_t vartype = left->vartype;
 		char *key = resolved_key;
 		resolved_key = NULL;
@@ -1728,7 +1730,10 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		strlcpy(template_name, right->export_name->s, template_size + 1);
 		amtail_variable *template_var = alligator_ht_search(variables, amtail_variable_compare, template_name, amtail_hash(template_name, template_size));
 		if (template_var)
+		{
 			vartype = template_var->type;
+			hidden = template_var->hidden;
+		}
 
 		string *new_export_name = string_new();
 		string_cat(new_export_name, template_name, template_size);
