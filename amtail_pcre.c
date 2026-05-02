@@ -31,6 +31,24 @@ regex_match* amtail_regex_compile(char *regexstring)
         return 0;
     }
 
+    if (rematch->pcreExtra && rematch->jstack) {
+        pcre_assign_jit_stack(rematch->pcreExtra, NULL, rematch->jstack);
+    }
+
+    {
+        int nc = 0, esz = 0;
+        const unsigned char *ntab = NULL;
+        if (pcre_fullinfo(rematch->regex_compiled, rematch->pcreExtra, PCRE_INFO_NAMECOUNT, &nc) >= 0 &&
+            pcre_fullinfo(rematch->regex_compiled, rematch->pcreExtra, PCRE_INFO_NAMEENTRYSIZE, &esz) >= 0 &&
+            pcre_fullinfo(rematch->regex_compiled, rematch->pcreExtra, PCRE_INFO_NAMETABLE, &ntab) >= 0 &&
+            nc > 0 && esz > 0 && ntab)
+        {
+            rematch->pcre_name_count = nc;
+            rematch->pcre_name_entry_size = esz;
+            rematch->pcre_name_table = ntab;
+        }
+    }
+
     return rematch;
 }
 
@@ -52,6 +70,13 @@ void amtail_regex_free(regex_match *rematch)
 
 uint8_t amtail_regex_exec(regex_match *rematch, char *regex_match_string, uint64_t regex_match_size, amtail_log_level amtail_ll)
 {
+    int ovector[OVECCOUNT];
+    int count = amtail_regex_exec_with_ovector(rematch, regex_match_string, regex_match_size, amtail_ll, ovector, OVECCOUNT);
+    return count > 0 ? count : 0;
+}
+
+int amtail_regex_exec_with_ovector(regex_match *rematch, char *regex_match_string, uint64_t regex_match_size, amtail_log_level amtail_ll, int *ovector, int ovecsize)
+{
     if (!rematch)
     {
         if (amtail_ll.pcre > 0)
@@ -59,15 +84,10 @@ uint8_t amtail_regex_exec(regex_match *rematch, char *regex_match_string, uint64
         return 0;
     }
 
-    int ovector[OVECCOUNT];
+    if (!ovector || ovecsize <= 0)
+        return 0;
 
-    //char temp_match[1255];
-    //strlcpy(temp_match, regex_match_string, regex_match_size+1);
-    //printf("\n\n'%s'\n", temp_match);
-
-    int count = pcre_exec(rematch->regex_compiled, rematch->pcreExtra, regex_match_string, regex_match_size, 0, 0, ovector, OVECCOUNT);
-    //printf("rc is %d\n", count);
-    //printf("rc is %d, p is %p\n", count, tmp);
+    int count = pcre_exec(rematch->regex_compiled, rematch->pcreExtra, regex_match_string, regex_match_size, 0, 0, ovector, ovecsize);
     if(count < 0)
     {
         if (count == PCRE_ERROR_NOMATCH)

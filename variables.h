@@ -23,6 +23,8 @@ typedef struct amtail_variable {
 	double histogram_sum;
 	uint64_t histogram_count;
 	uint8_t is_template;
+	/* Dedup for amtail_touch_record per carg->amtail_touch_seq. */
+	uint32_t touch_seq;
 
 	tommy_node node;
 } amtail_variable;

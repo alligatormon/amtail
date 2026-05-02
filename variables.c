@@ -132,7 +132,10 @@ inline uint32_t amtail_hash(char *str, uint64_t syms)
 {
 	if (!str || !syms)
 		return 0;
-	return (uint32_t)(((uint8_t)str[0] * 33u) + (uint8_t)str[syms - 1]);
+	uint32_t h = (uint8_t)str[0];
+	h = (h << 5) - h + (uint8_t)str[syms - 1];
+	h ^= (uint8_t)str[syms >> 1];
+	return h;
 }
 
 void amtail_variable_free(void *funcarg, void* arg)
