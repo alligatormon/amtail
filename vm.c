@@ -4,7 +4,6 @@
 #include "amtail_pcre.h"
 #include "vm.h"
 #include "variables.h"
-#include "events/context_arg.h"
 #include "dstructures/ht.h"
 #include "dstructures/tommy.h"
 #include <stdlib.h>
@@ -13,35 +12,15 @@
 #include <ctype.h>
 #include <time.h>
 
-void amtail_touch_begin(struct context_arg *carg)
+static void amtail_invoke_var_touched(amtail_thread *t, amtail_variable *v)
 {
-	if (!carg)
+	if (!t || !t->touch.on_var_touched || !v)
 		return;
-	++carg->amtail_touch_seq;
-	if (carg->amtail_touch_seq == 0)
-		carg->amtail_touch_seq = 1;
-	carg->amtail_touch_n = 0;
-}
-
-void amtail_touch_record(struct context_arg *carg, amtail_variable *v)
-{
-	if (!carg || !v || v->is_template || v->hidden)
+	if (v->is_template || v->hidden)
 		return;
 	if (!v->export_name || !v->export_name->s)
 		return;
-	if (v->touch_seq == carg->amtail_touch_seq)
-		return;
-	v->touch_seq = carg->amtail_touch_seq;
-	if (carg->amtail_touch_n >= carg->amtail_touch_cap)
-	{
-		size_t ncap = carg->amtail_touch_cap ? carg->amtail_touch_cap * 2 : 64;
-		amtail_variable **nb = realloc(carg->amtail_touch_buf, ncap * sizeof(*nb));
-		if (!nb)
-			return;
-		carg->amtail_touch_buf = nb;
-		carg->amtail_touch_cap = ncap;
-	}
-	carg->amtail_touch_buf[carg->amtail_touch_n++] = v;
+	t->touch.on_var_touched(t->touch.userdata, v);
 }
 
 void (*amtail_vmfunc[256])(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll);
@@ -49,12 +28,58 @@ void amtail_vmstack_push(amtail_thread *amt_thread, amtail_byteop *byte_ops);
 static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables);
 static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *variables);
 
-static void amtail_vm_set_capture_variable(alligator_ht *variables, const char *name, const char *value, size_t value_len)
+/* Copy capture slice into var->s; grows buffer in place (no strnlen, no free+realloc churn). */
+static int amtail_vm_capture_assign_text(amtail_variable *var, const char *value, size_t value_len)
 {
-	if (!variables || !name || !*name)
+	const size_t need = value_len + 1;
+
+	if (!var->s)
+	{
+		var->s = malloc(sizeof(*var->s));
+		if (!var->s)
+			return 0;
+		size_t cap = need < 32 ? 32 : need;
+		var->s->s = malloc(cap);
+		if (!var->s->s)
+		{
+			free(var->s);
+			var->s = NULL;
+			return 0;
+		}
+		var->s->m = cap;
+		memcpy(var->s->s, value, value_len);
+		var->s->s[value_len] = '\0';
+		var->s->l = value_len;
+		return 1;
+	}
+
+	if (var->s->m >= need)
+	{
+		memcpy(var->s->s, value, value_len);
+		var->s->s[value_len] = '\0';
+		var->s->l = value_len;
+		return 1;
+	}
+
+	size_t cap = need;
+	if (var->s->m && cap < var->s->m * 2)
+		cap = var->s->m * 2;
+	char *ns = realloc(var->s->s, cap);
+	if (!ns)
+		return 0;
+	var->s->s = ns;
+	var->s->m = cap;
+	memcpy(var->s->s, value, value_len);
+	var->s->s[value_len] = '\0';
+	var->s->l = value_len;
+	return 1;
+}
+
+static void amtail_vm_set_capture_variable(alligator_ht *variables, const char *name, size_t name_len, const char *value, size_t value_len)
+{
+	if (!variables || !name || !name_len)
 		return;
 
-	size_t name_len = strlen(name);
 	enum { KEY_STACK_MAX = 256 };
 	char stack_key[KEY_STACK_MAX];
 	char *lookup_key;
@@ -78,7 +103,10 @@ static void amtail_vm_set_capture_variable(alligator_ht *variables, const char *
 	}
 
 	uint32_t name_hash = amtail_hash(lookup_key, name_len + 1);
-	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, lookup_key, name_hash);
+	amtail_lookup_key lk = { lookup_key, name_len + 1 };
+	//printf("amtail_vm_set_capture_variable lookup_key: %s, name_hash: %u\n", lookup_key, name_hash);
+	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, name_hash);
+	//printf("amtail_vm_set_capture_variable var: %p\n", var);
 	if (!var)
 	{
 		var = calloc(1, sizeof(*var));
@@ -96,17 +124,30 @@ static void amtail_vm_set_capture_variable(alligator_ht *variables, const char *
 			if (!key_heap)
 			{
 				free(var);
+				if (lookup_heap)
+					free(lookup_key);
 				return;
 			}
 			memcpy(key_heap, stack_key, name_len + 2);
-			var->key = key_heap;
+			var->key = string_init_dup(key_heap);
+			free(key_heap);
 		}
 		else
 		{
-			var->key = lookup_key;
+			var->key = malloc(sizeof(string));
+			if (!var->key)
+			{
+				free(var);
+				if (lookup_heap)
+					free(lookup_key);
+				return;
+			}
+			var->key->s = lookup_key;
+			var->key->l = name_len + 1;
+			var->key->m = name_len + 2;
 			lookup_heap = 0;
 		}
-		var->export_name = string_init_dup(var->key);
+		var->export_name = string_string_init_dup(var->key);
 		alligator_ht_insert_nolock(variables, &(var->node), var, name_hash);
 	}
 	else
@@ -114,21 +155,9 @@ static void amtail_vm_set_capture_variable(alligator_ht *variables, const char *
 		if (lookup_heap)
 			free(lookup_key);
 		var->type = ALLIGATOR_VARTYPE_TEXT;
-		if (var->s && var->s->m >= value_len + 1)
-		{
-			memcpy(var->s->s, value, value_len);
-			var->s->s[value_len] = '\0';
-			var->s->l = value_len;
-			return;
-		}
-		if (var->s)
-		{
-			string_free(var->s);
-			var->s = NULL;
-		}
 	}
 
-	var->s = string_init_alloc((char*)value, value_len);
+	(void)amtail_vm_capture_assign_text(var, value, value_len);
 }
 
 static void amtail_vm_apply_named_captures(regex_match *rematch, char *line, uint64_t line_size, alligator_ht *variables, const int *ovector, int count)
@@ -144,8 +173,8 @@ static void amtail_vm_apply_named_captures(regex_match *rematch, char *line, uin
 
 	for (int i = 0; i < namecount; ++i)
 	{
-		const unsigned char *entry = name_table + i * entry_size;
-		int group_index = (entry[0] << 8) | entry[1];
+		const unsigned char *entry = name_table + (size_t)i * (size_t)entry_size;
+		int group_index = ((int)entry[0] << 8) | (int)entry[1];
 		if (group_index <= 0 || group_index >= count)
 			continue;
 
@@ -154,8 +183,15 @@ static void amtail_vm_apply_named_captures(regex_match *rematch, char *line, uin
 		if (start < 0 || end < start || (uint64_t)end > line_size)
 			continue;
 
-		const char *group_name = (const char*)(entry + 2);
-		amtail_vm_set_capture_variable(variables, group_name, line + start, (size_t)(end - start));
+		if (entry_size <= 2)
+			continue;
+		const char *group_name = (const char *)(entry + 2);
+		size_t name_max = (size_t)entry_size - 2u;
+		size_t gnlen = strnlen(group_name, name_max);
+		if (!gnlen)
+			continue;
+
+		amtail_vm_set_capture_variable(variables, group_name, gnlen, line + start, (size_t)(end - start));
 	}
 }
 
@@ -525,8 +561,9 @@ static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables
 	{
 		if (variables)
 		{
+			amtail_lookup_key lk = { op->export_name->s, op->export_name->l };
 			amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare,
-			                                           op->export_name->s,
+			                                           &lk,
 			                                           amtail_hash(op->export_name->s, op->export_name->l));
 			if (var)
 			{
@@ -562,14 +599,17 @@ static int amtail_vm_resolve_metric_token(char *key, size_t token_len, alligator
 	if (!variables || !token_len)
 		return 0;
 
+	amtail_lookup_key lk = { key, token_len };
 	uint32_t h = amtail_hash((char*)key, token_len);
-	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, key, h);
+	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, h);
 	if (!var && key[0] == '$' && token_len > 1)
 	{
 		size_t tl = token_len - 1;
 		memmove(key, key + 1, tl + 1);
 		h = amtail_hash((char*)key, tl);
-		var = alligator_ht_search_nolock(variables, amtail_variable_compare, key, h);
+		lk.p = key;
+		lk.l = tl;
+		var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, h);
 	}
 
 	*emit_heap_allocated = 0;
@@ -619,12 +659,14 @@ static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *va
 		return NULL;
 
 	size_t name_len = strlen(name);
-	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, (void*)name, amtail_hash((char*)name, name_len));
+	amtail_lookup_key lk = { name, name_len };
+	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, amtail_hash((char*)name, name_len));
 	if (!var && name[0] == '$' && name[1])
 	{
 		const char *trimmed = name + 1;
 		size_t trimmed_len = strlen(trimmed);
-		var = alligator_ht_search_nolock(variables, amtail_variable_compare, (void*)trimmed, amtail_hash((char*)trimmed, trimmed_len));
+		amtail_lookup_key lk2 = { trimmed, trimmed_len };
+		var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk2, amtail_hash((char*)trimmed, trimmed_len));
 	}
 
 	if (!var)
@@ -650,18 +692,21 @@ static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *va
 	return NULL;
 }
 
-static char *amtail_vm_interpolate_metric_key(const char *raw_key, alligator_ht *variables)
+/* raw_len: logical length (e.g. string->l); 0 means use strlen(raw_key). */
+static char *amtail_vm_interpolate_metric_key(const char *raw_key, size_t raw_len, alligator_ht *variables)
 {
 	if (!raw_key)
 		return NULL;
 
-	size_t raw_len = 0;
+	if (raw_len == 0)
+		raw_len = strlen(raw_key);
+
 	int has_template = 0;
-	for (const char *s = raw_key; *s; ++s)
-	{
-		++raw_len;
-		if (!has_template && s[0] == '[' && s[1] == '$')
+	for (size_t i = 0; i + 2 <= raw_len; ++i) {
+		if (raw_key[i] == '[' && raw_key[i + 1] == '$') {
 			has_template = 1;
+			break;
+		}
 	}
 	if (!has_template)
 		return NULL;
@@ -669,7 +714,7 @@ static char *amtail_vm_interpolate_metric_key(const char *raw_key, alligator_ht 
 	size_t cap = raw_len * 2u + 64u;
 	if (cap < raw_len + 1u)
 		cap = raw_len + 1u;
-	char *out = calloc(1, cap);
+	char *out = malloc(cap);
 	if (!out)
 		return NULL;
 
@@ -677,23 +722,19 @@ static char *amtail_vm_interpolate_metric_key(const char *raw_key, alligator_ht 
 	char keybuf[TOK_STACK];
 
 	size_t oi = 0;
+	const char *raw_end = raw_key + raw_len;
 	const char *p = raw_key;
-	while (*p)
-	{
-		if (p[0] == '[' && p[1] == '$')
-		{
-			const char *end = strchr(p, ']');
-			if (end)
-			{
+	while (p < raw_end) {
+		if (p + 1 < raw_end && p[0] == '[' && p[1] == '$') {
+			const char *end = memchr(p + 2, ']', (size_t)(raw_end - (p + 2)));
+			if (end) {
 				const char *literal = p + 1;
 				size_t token_len = (size_t)(end - literal);
 				char *keyheap = NULL;
 				char *key = keybuf;
-				if (token_len + 1u > TOK_STACK)
-				{
+				if (token_len + 1u > TOK_STACK) {
 					keyheap = malloc(token_len + 1u);
-					if (!keyheap)
-					{
+					if (!keyheap) {
 						free(out);
 						return NULL;
 					}
@@ -705,22 +746,19 @@ static char *amtail_vm_interpolate_metric_key(const char *raw_key, alligator_ht 
 				const char *emit;
 				size_t emit_len;
 				int emit_heap = 0;
-				if (!amtail_vm_resolve_metric_token(key, token_len, variables, &emit, &emit_len, &emit_heap))
-				{
+				if (!amtail_vm_resolve_metric_token(key, token_len, variables, &emit, &emit_len, &emit_heap)) {
 					emit = literal;
 					emit_len = token_len;
 				}
 
-				if (oi + emit_len + 2u >= cap)
-				{
+				if (oi + emit_len + 2u >= cap) {
 					size_t ncap = (oi + emit_len + 2u) * 2u;
 					if (ncap < cap * 2u)
 						ncap = cap * 2u;
 					char *nout = realloc(out, ncap);
-					if (!nout)
-					{
+					if (!nout) {
 						if (emit_heap)
-							free((void*)emit);
+							free((void *)emit);
 						free(keyheap);
 						free(out);
 						return NULL;
@@ -730,27 +768,24 @@ static char *amtail_vm_interpolate_metric_key(const char *raw_key, alligator_ht 
 				}
 
 				out[oi++] = '[';
-				if (emit_len)
-				{
+				if (emit_len) {
 					memcpy(out + oi, emit, emit_len);
 					oi += emit_len;
 				}
 				out[oi++] = ']';
 
 				if (emit_heap)
-					free((void*)emit);
+					free((void *)emit);
 				free(keyheap);
 				p = end + 1;
 				continue;
 			}
 		}
 
-		if (oi + 2u >= cap)
-		{
+		if (oi + 2u >= cap) {
 			size_t ncap = cap * 2u;
 			char *nout = realloc(out, ncap);
-			if (!nout)
-			{
+			if (!nout) {
 				free(out);
 				return NULL;
 			}
@@ -838,9 +873,13 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	if (!resolved)
 		return;
 
-	char *resolved_key = amtail_vm_interpolate_metric_key(byte_ops->export_name->s, variables);
+	char *resolved_key = NULL;
+	if (byte_ops->metric_key_interpolate)
+		resolved_key = amtail_vm_interpolate_metric_key(byte_ops->export_name->s, byte_ops->export_name->l, variables);
 	char *lookup_key = resolved_key ? resolved_key : byte_ops->export_name->s;
-	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, lookup_key,amtail_hash(lookup_key, strlen(lookup_key)));
+	size_t lookup_len = strlen(lookup_key);
+	amtail_lookup_key lk = { lookup_key, lookup_len };
+	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, amtail_hash(lookup_key, lookup_len));
 	if (var)
 	{
 		resolved->vartype = var->type;
@@ -970,7 +1009,7 @@ uint64_t amtail_vmfunc_branch(amtail_thread *amt_thread, amtail_byteop *byte_ops
 
 	int ovector[240];
 	int match = amtail_regex_exec_with_ovector(byte_ops->re_match, logline->s + offset, line_size, amtail_ll, ovector, 240);
-	if (match)
+	if (match && byte_ops->re_match->pcre_name_count > 0)
 		amtail_vm_apply_named_captures(byte_ops->re_match, logline->s + offset, line_size, variables, ovector, match);
 	//fprintf(stderr, "branch pcre '%s' (jmp %"PRIu64", res: %"PRIu8" with logline '%p'\n", byte_ops->export_name->s+1, byte_ops->right_opcounter, match, logline->s);
 	if (match)
@@ -1302,7 +1341,7 @@ void amtail_vmfunc_match(amtail_thread *amt_thread, amtail_byteop *byte_ops, all
 
 	int ovector[240];
 	int matched = amtail_regex_exec_with_ovector(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size, amtail_ll, ovector, 240);
-	if (matched)
+	if (matched && byte_ops->re_match->pcre_name_count > 0)
 		amtail_vm_apply_named_captures(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size, variables, ovector, matched);
 	amtail_vm_push_bool(amt_thread, matched ? 1 : 0);
 }
@@ -1911,10 +1950,14 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		return;
 	}
 
-	char *resolved_key = amtail_vm_interpolate_metric_key(right->export_name->s, variables);
+	char *resolved_key = NULL;
+	if (right->metric_key_interpolate)
+		resolved_key = amtail_vm_interpolate_metric_key(right->export_name->s, right->export_name->l, variables);
 	const char *lookup_key = resolved_key ? resolved_key : right->export_name->s;
-	uint32_t name_hash = amtail_hash((char*)lookup_key, strlen(lookup_key));
-	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, (void*)lookup_key, name_hash);
+	size_t lookup_len = strlen(lookup_key);
+	amtail_lookup_key lk = { lookup_key, lookup_len };
+	uint32_t name_hash = amtail_hash((char*)lookup_key, lookup_len);
+	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, name_hash);
 	if (!var)
 	{
 		/* Implicit vars created by assignment should be local (hidden)
@@ -1933,7 +1976,8 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		char template_name[255];
 		uint8_t template_size = strcspn(right->export_name->s, "[");
 		strlcpy(template_name, right->export_name->s, template_size + 1);
-		amtail_variable *template_var = alligator_ht_search_nolock(variables, amtail_variable_compare, template_name, amtail_hash(template_name, template_size));
+		amtail_lookup_key tmplk = { template_name, template_size };
+		amtail_variable *template_var = alligator_ht_search_nolock(variables, amtail_variable_compare, &tmplk, amtail_hash(template_name, template_size));
 		if (template_var)
 		{
 			vartype = template_var->type;
@@ -1973,6 +2017,7 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		}
 
 		var = amtail_variable_make(hidden, vartype, key, new_export_name, by, by_count, by_positions);
+		free(key);
 		if (template_var && template_var->bucket && template_var->bucket_count)
 		{
 			bucket = template_var->bucket;
@@ -1984,37 +2029,37 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 			amtail_histogram_init(var);
 		alligator_ht_insert_nolock(variables, &(var->node), var, name_hash);
 		if (!var->is_template && !var->hidden)
-			amtail_touch_record(amt_thread->touch_carg, var);
+			amtail_invoke_var_touched(amt_thread, var);
 	}
 	free(resolved_key);
 
 	if (var->type == ALLIGATOR_VARTYPE_COUNTER && left->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		var->i = left->li;
-		amtail_touch_record(amt_thread->touch_carg, var);
+		amtail_invoke_var_touched(amt_thread, var);
 		if (amtail_ll.vm > 1)
-			fprintf(stderr, "load variable %s/%s: c/c %"PRIu64"\n", var->export_name->s, var->key, var->i);
+			fprintf(stderr, "load variable %s/%s: c/c %"PRIu64"\n", var->export_name->s, var->key->s, var->i);
 	}
 	else if (var->type == ALLIGATOR_VARTYPE_GAUGE && left->vartype == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		var->d = left->li;
-		amtail_touch_record(amt_thread->touch_carg, var);
+		amtail_invoke_var_touched(amt_thread, var);
 		if (amtail_ll.vm > 1)
-			fprintf(stderr, "load variable %s/%s: g/c %lf\n", var->export_name->s, var->key, var->d);
+			fprintf(stderr, "load variable %s/%s: g/c %lf\n", var->export_name->s, var->key->s, var->d);
 	}
 	else if (var->type == ALLIGATOR_VARTYPE_COUNTER && left->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		var->i = left->ld;
-		amtail_touch_record(amt_thread->touch_carg, var);
+		amtail_invoke_var_touched(amt_thread, var);
 		if (amtail_ll.vm > 1)
-			fprintf(stderr, "load variable %s/%s: c/g %"PRIu64"\n", var->export_name->s, var->key, var->i);
+			fprintf(stderr, "load variable %s/%s: c/g %"PRIu64"\n", var->export_name->s, var->key->s, var->i);
 	}
 	else if (var->type == ALLIGATOR_VARTYPE_GAUGE && left->vartype == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		var->d = left->ld;
-		amtail_touch_record(amt_thread->touch_carg, var);
+		amtail_invoke_var_touched(amt_thread, var);
 		if (amtail_ll.vm > 1) {
-			fprintf(stderr, "load variable %s/%s: g/g %lf, by %p(%"PRIu8")\n", var->export_name->s, var->key, var->d, var->by, var->by_count);
+			fprintf(stderr, "load variable %s/%s: g/g %lf, by %p(%"PRIu8")\n", var->export_name->s, var->key->s, var->d, var->by, var->by_count);
 			if (var->by && var->by_count)
 			{
 				for (uint64_t i = 0; i < var->by_count; ++i)
@@ -2028,7 +2073,7 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 			amtail_histogram_observe(var, (double)left->li);
 		else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE)
 			amtail_histogram_observe(var, left->ld);
-		amtail_touch_record(amt_thread->touch_carg, var);
+		amtail_invoke_var_touched(amt_thread, var);
 	}
 	else if (var->type == ALLIGATOR_VARTYPE_TEXT && left->vartype == ALLIGATOR_VARTYPE_TEXT &&
 	         left->ls && left->ls->s)
@@ -2046,9 +2091,9 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 				string_free(var->s);
 			var->s = string_string_init_dup(left->ls);
 		}
-		amtail_touch_record(amt_thread->touch_carg, var);
+		amtail_invoke_var_touched(amt_thread, var);
 		if (amtail_ll.vm > 1)
-			fprintf(stderr, "load variable %s/%s: t/t '%s'\n", var->export_name->s, var->key, var->s->s);
+			fprintf(stderr, "load variable %s/%s: t/t '%s'\n", var->export_name->s, var->key->s, var->s->s);
 	}
 
 	amtail_vm_free_tempop(left);
@@ -2062,14 +2107,15 @@ void amtail_vmfunc_inc(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 {
 	if (!byte_ops || !byte_ops->export_name || !byte_ops->export_name->s)
 		return;
-	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, byte_ops->export_name->s, amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l));
+	amtail_lookup_key lk = { byte_ops->export_name->s, byte_ops->export_name->l };
+	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l));
 	if (var)
 	{
 		if (var->type == ALLIGATOR_VARTYPE_COUNTER)
 			++var->i;
 		else if (var->type == ALLIGATOR_VARTYPE_GAUGE)
 			++var->d;
-		amtail_touch_record(amt_thread->touch_carg, var);
+		amtail_invoke_var_touched(amt_thread, var);
 	}
 }
 
@@ -2077,27 +2123,29 @@ void amtail_vmfunc_dec(amtail_thread *amt_thread, amtail_byteop *byte_ops, allig
 {
 	if (!byte_ops || !byte_ops->export_name || !byte_ops->export_name->s)
 		return;
-	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, byte_ops->export_name->s, amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l));
+	amtail_lookup_key lk = { byte_ops->export_name->s, byte_ops->export_name->l };
+	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l));
 	if (var)
 	{
 		if (var->type == ALLIGATOR_VARTYPE_COUNTER)
 			--var->i;
 		else if (var->type == ALLIGATOR_VARTYPE_GAUGE)
 			--var->d;
-		amtail_touch_record(amt_thread->touch_carg, var);
+		amtail_invoke_var_touched(amt_thread, var);
 	}
 }
 
 void amtail_vmfunc_variable(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
 {
 	uint32_t name_hash = amtail_hash(byte_ops->export_name->s, byte_ops->export_name->l);
-	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, byte_ops->export_name->s, name_hash);
+	amtail_lookup_key lk = { byte_ops->export_name->s, byte_ops->export_name->l };
+	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, name_hash);
 	if (!var)
 	{
 		var = calloc(1, sizeof(*var));
 		var->hidden = byte_ops->hidden;
 		var->type = byte_ops->vartype;
-		var->key = strdup(byte_ops->export_name->s);
+		var->key = string_string_init_dup(byte_ops->export_name);
 		var->export_name = string_new();
 
 		if (byte_ops->by_count)
@@ -2129,7 +2177,7 @@ void amtail_vmfunc_variable(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 			printf("create variable %s with type %hhu and pointer: %p\n", byte_ops->export_name->s, byte_ops->vartype, var);
 		alligator_ht_insert_nolock(variables, &(var->node), var, name_hash);
 		if (!var->is_template && !var->hidden)
-			amtail_touch_record(amt_thread->touch_carg, var);
+			amtail_invoke_var_touched(amt_thread, var);
 	}
 	else
 		if (amtail_ll.vm > 0)
@@ -2340,7 +2388,7 @@ void amtail_bytecode_dump(amtail_bytecode* byte_code)
 	}
 }
 
-int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, const char *filename, amtail_log_level amtail_ll, struct context_arg *touch_carg, struct amtail_thread *reuse_thread)
+int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, const char *filename, amtail_log_level amtail_ll, const amtail_touch_callbacks *touch, struct amtail_thread *reuse_thread)
 {
 	uint64_t size = byte_code->l;
 	amtail_byteop *byte_ops = byte_code->ops;
@@ -2355,7 +2403,10 @@ int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string*
 		owns_thread = 1;
 	}
 	amt_thread->filename = filename;
-	amt_thread->touch_carg = touch_carg;
+	if (touch)
+		amt_thread->touch = *touch;
+	else
+		memset(&amt_thread->touch, 0, sizeof(amt_thread->touch));
 
 	if (!byte_code->prepared)
 	{
@@ -2389,7 +2440,7 @@ int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string*
 			{
 				printf("error execute on logline: '%s', %d\n", logline->s, rc);
 				amtail_vm_stack_clear(amt_thread);
-				amt_thread->touch_carg = NULL;
+				memset(&amt_thread->touch, 0, sizeof(amt_thread->touch));
 				if (owns_thread)
 					amtail_thread_free(amt_thread);
 				return rc;
@@ -2401,13 +2452,13 @@ int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string*
 	}
 
 	amtail_vm_stack_clear(amt_thread);
-	amt_thread->touch_carg = NULL;
+	memset(&amt_thread->touch, 0, sizeof(amt_thread->touch));
 	if (owns_thread)
 		amtail_thread_free(amt_thread);
 	return 1;
 }
 
-int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, amtail_log_level amtail_ll, struct context_arg *touch_carg, struct amtail_thread *reuse_thread)
+int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, amtail_log_level amtail_ll, const amtail_touch_callbacks *touch, struct amtail_thread *reuse_thread)
 {
-	return amtail_run_file(byte_code, variables, logline, NULL, amtail_ll, touch_carg, reuse_thread);
+	return amtail_run_file(byte_code, variables, logline, NULL, amtail_ll, touch, reuse_thread);
 }

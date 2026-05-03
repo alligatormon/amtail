@@ -9,6 +9,8 @@ typedef struct amtail_byteop {
 	uint8_t vartype;
 	uint8_t facttype;
 	uint8_t hidden;
+	/* Set at compile time: 1 if export_name may contain `[$` and needs runtime interpolation. */
+	uint8_t metric_key_interpolate;
 	union {
 		double ld;
 		int64_t li;

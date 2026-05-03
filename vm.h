@@ -3,7 +3,10 @@
 #include "variables.h"
 #define AMTAIL_VM_STACK_SIZE 1024
 
-struct context_arg;
+typedef struct amtail_touch_callbacks {
+	void *userdata;
+	void (*on_var_touched)(void *userdata, amtail_variable *var);
+} amtail_touch_callbacks;
 
 typedef struct amtail_thread {
     amtail_byteop* stack[AMTAIL_VM_STACK_SIZE];
@@ -19,15 +22,14 @@ typedef struct amtail_thread {
     /* Filename of the log the current line came from; used by getfilename().
      * NULL if the caller does not provide one. Not owned by the thread. */
     const char *filename;
-    struct context_arg *touch_carg;
+    /* Active for the current amtail_run/amtail_run_file; cleared before return. */
+    amtail_touch_callbacks touch;
 } amtail_thread;
 
 amtail_thread *amtail_thread_init(void);
 void amtail_thread_free(amtail_thread *amt_thread);
 
 void amtail_bytecode_dump(amtail_bytecode* byte_code);
-int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, amtail_log_level amtail_ll, struct context_arg *touch_carg, struct amtail_thread *reuse_thread);
-int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, const char *filename, amtail_log_level amtail_ll, struct context_arg *touch_carg, struct amtail_thread *reuse_thread);
-void amtail_touch_begin(struct context_arg *carg);
-void amtail_touch_record(struct context_arg *carg, amtail_variable *var);
+int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, amtail_log_level amtail_ll, const amtail_touch_callbacks *touch, struct amtail_thread *reuse_thread);
+int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, const char *filename, amtail_log_level amtail_ll, const amtail_touch_callbacks *touch, struct amtail_thread *reuse_thread);
 void amtail_vm_init();

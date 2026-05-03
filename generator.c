@@ -1,6 +1,7 @@
 #include "common/selector.h"
 #include "parser.h"
 #include "generator.h"
+#include <stddef.h>
 #include <string.h>
 #include "amtail_pcre.h"
 
@@ -47,6 +48,17 @@ static void copy_labels(string **src, uint8_t src_count, string ***dst, uint8_t 
 		if (src[i] && src[i]->s && src[i]->l)
 			(*dst)[i] = string_init_alloc(src[i]->s, src[i]->l);
 	}
+}
+
+static int amtail_export_name_has_metric_template(const string *sn)
+{
+	if (!sn || !sn->s || sn->l < 2)
+		return 0;
+	for (size_t i = 0; i + 2 <= sn->l; ++i) {
+		if (sn->s[i] == '[' && sn->s[i + 1] == '$')
+			return 1;
+	}
+	return 0;
 }
 
 static void compile_regex_for_op(amtail_byteop *op, amtail_log_level amtail_ll)
@@ -214,6 +226,11 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
 	}
 
 	compile_regex_for_op(fill, amtail_ll);
+
+	if (fill->export_name)
+		fill->metric_key_interpolate = (uint8_t)amtail_export_name_has_metric_template(fill->export_name);
+	else
+		fill->metric_key_interpolate = 0;
 
 	if (fill->opcode == AMTAIL_AST_OPCODE_VAR)
 	{

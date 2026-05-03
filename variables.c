@@ -12,7 +12,7 @@ void amtail_variables_dump_foreach(void *funcarg, void* arg)
 	if (var->is_template)
 		return;
 
-	fprintf(stderr, "dump %s/%s\n", var->export_name->s, var->key);
+	fprintf(stderr, "dump %s/%s\n", var->export_name->s, var->key ? var->key->s : "");
 
 	string *dst = funcarg;
 	string_string_cat(dst, var->export_name);
@@ -25,7 +25,7 @@ void amtail_variables_dump_foreach(void *funcarg, void* arg)
 			if (i)
 				string_cat(dst, ", ", 2);
 
-            char *ptrby = var->key + var->by_positions[i];
+            char *ptrby = var->key->s + var->by_positions[i];
             uint8_t key_len = var->by_positions[i+1] - var->by_positions[i] - 2;
             printf("by_position is %hhu/len %hhu (next %hhu)\n", var->by_positions[i], key_len, var->by_positions[i+1]);
 			//ptrby = strstr(ptrby, "[");
@@ -77,9 +77,13 @@ void amtail_variables_dump(alligator_ht *variables)
 
 int amtail_variable_compare(const void* arg, const void* obj)
 {
-	char *s1 = (char*)arg;
-	char *s2 = ((amtail_variable*)obj)->key;
-	return strcmp(s1, s2);
+	const amtail_lookup_key *lk = arg;
+	const amtail_variable *v = obj;
+	if (!lk || !v || !v->key || !v->key->s)
+		return -1;
+	if (lk->l != v->key->l)
+		return lk->l < v->key->l ? -1 : 1;
+	return memcmp(lk->p, v->key->s, lk->l);
 }
 
 int variable_parse_set_value(amtail_variable *var, string *s)
@@ -119,7 +123,7 @@ amtail_variable* amtail_variable_make(uint8_t hidden, uint8_t vartype, char *key
 	amtail_variable *var = calloc(1, sizeof(*var));
 	var->hidden = hidden;
 	var->type = vartype;
-	var->key = key;
+	var->key = key ? string_init_dup(key) : NULL;
 	var->export_name = export_name;
 	var->by = by;
 	var->by_count = by_count;
@@ -132,10 +136,31 @@ inline uint32_t amtail_hash(char *str, uint64_t syms)
 {
 	if (!str || !syms)
 		return 0;
-	uint32_t h = (uint8_t)str[0];
-	h = (h << 5) - h + (uint8_t)str[syms - 1];
-	h ^= (uint8_t)str[syms >> 1];
-	return h;
+
+	uint32_t h = 0;
+	if (syms < 6) {
+		if (syms >= 4) {
+			uint32_t w;
+			memcpy(&w, str, sizeof(w));
+			h = (h << 5) - h + w;
+			for (uint64_t i = 4; i < syms; ++i)
+				h = (h << 5) - h + (uint8_t)str[i];
+		} else {
+			uint32_t w = 0;
+			memcpy(&w, str, (size_t)syms);
+			h = (h << 5) - h + w;
+		}
+		return h;
+	} else {
+		uint32_t head, tail;
+		memcpy(&head, str, sizeof(head));
+		memcpy(&tail, str + syms - sizeof(uint32_t), sizeof(tail));
+		h = head;
+		h = (h << 5) - h + tail;
+		h ^= (uint32_t)str[syms >> 1];
+		h ^= (uint32_t)syms;
+		return h;
+	}
 }
 
 void amtail_variable_free(void *funcarg, void* arg)
@@ -146,7 +171,7 @@ void amtail_variable_free(void *funcarg, void* arg)
 	if (var->export_name)
 		string_free(var->export_name);
 	if (var->key)
-		free(var->key);
+		string_free(var->key);
 	if ((var->type == ALLIGATOR_VARTYPE_TEXT || var->type == ALLIGATOR_VARTYPE_CONST) && var->s)
 		string_free(var->s);
 	if (var->by_positions)

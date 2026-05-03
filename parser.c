@@ -286,6 +286,10 @@ static void amtail_parser_const_free(void *arg)
 	if (!var)
 		return;
 
+	if (var->export_name)
+		string_free(var->export_name);
+	if (var->key)
+		string_free(var->key);
 	if (var->facttype == ALLIGATOR_FACTTYPE_TEXT && var->s)
 		string_free(var->s);
 	free(var);
@@ -944,8 +948,9 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			continue;
 		}
 
+		amtail_lookup_key const_lk = { t, tok->l };
 		if (t[0] == '/' || (!pstate.expression && t[0] == '+') || pstate.branch ||
-			alligator_ht_search(const_data, amtail_variable_compare, t, amtail_hash(t, tok->l)))
+			alligator_ht_search(const_data, amtail_variable_compare, &const_lk, amtail_hash((char *)t, tok->l)))
 		{
 			uint8_t created_name = 0;
 			pstate.branch = 1;
@@ -967,7 +972,8 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			}
 			else
 			{
-				amtail_variable *v = alligator_ht_search(const_data, amtail_variable_compare, t, amtail_hash(t, tok->l));
+				amtail_lookup_key vlk = { t, tok->l };
+				amtail_variable *v = alligator_ht_search(const_data, amtail_variable_compare, &vlk, amtail_hash((char *)t, tok->l));
 				if (!v)
 				{
 					if (created_name)

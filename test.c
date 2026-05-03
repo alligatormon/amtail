@@ -413,33 +413,41 @@ static void runtime_insert_text(alligator_ht *variables, const char *name, const
 {
 	amtail_variable *var = calloc(1, sizeof(*var));
 	var->type = ALLIGATOR_VARTYPE_TEXT;
-	var->key = strdup(name);
+	var->key = string_init_dup((char *)name);
 	var->export_name = string_init_dup((char*)name);
 	var->s = string_init_dup((char*)value);
-	alligator_ht_insert(variables, &var->node, var, amtail_hash(var->key, strlen(var->key)));
+	alligator_ht_insert(variables, &var->node, var, amtail_hash(var->key->s, var->key->l));
 }
 
 static int runtime_expect_counter(alligator_ht *variables, const char *name, int64_t expect)
 {
-	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, name, amtail_hash((char*)name, strlen(name)));
+	size_t nl = strlen(name);
+	amtail_lookup_key lk = { name, nl };
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, &lk, amtail_hash((char*)name, nl));
 	return var && var->type == ALLIGATOR_VARTYPE_COUNTER && var->i == expect;
 }
 
 static int runtime_expect_gauge_positive(alligator_ht *variables, const char *name)
 {
-	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, name, amtail_hash((char*)name, strlen(name)));
+	size_t nl = strlen(name);
+	amtail_lookup_key lk = { name, nl };
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, &lk, amtail_hash((char*)name, nl));
 	return var && var->type == ALLIGATOR_VARTYPE_GAUGE && var->d > 0;
 }
 
 static int runtime_expect_gauge_equal(alligator_ht *variables, const char *name, double expect)
 {
-	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, name, amtail_hash((char*)name, strlen(name)));
+	size_t nl = strlen(name);
+	amtail_lookup_key lk = { name, nl };
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, &lk, amtail_hash((char*)name, nl));
 	return var && var->type == ALLIGATOR_VARTYPE_GAUGE && var->d == expect;
 }
 
 static int runtime_expect_text(alligator_ht *variables, const char *name, const char *expect)
 {
-	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, name, amtail_hash((char*)name, strlen(name)));
+	size_t nl = strlen(name);
+	amtail_lookup_key lk = { name, nl };
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, &lk, amtail_hash((char*)name, nl));
 	return var && var->type == ALLIGATOR_VARTYPE_TEXT && var->s && var->s->s && strcmp(var->s->s, expect) == 0;
 }
 
@@ -649,11 +657,13 @@ static int vm_runtime_test_settime_strptime(void)
 		     runtime_expect_gauge_positive(variables, "parsed_go") &&
 		     runtime_expect_gauge_positive(variables, "reg_ts");
 		/* The register should mirror the parsed value. */
+		amtail_lookup_key lk_a = { "parsed_go", strlen("parsed_go") };
 		amtail_variable *a = alligator_ht_search(variables, amtail_variable_compare,
-		                                         "parsed_go",
+		                                         &lk_a,
 		                                         amtail_hash("parsed_go", strlen("parsed_go")));
+		amtail_lookup_key lk_b = { "reg_ts", strlen("reg_ts") };
 		amtail_variable *b = alligator_ht_search(variables, amtail_variable_compare,
-		                                         "reg_ts",
+		                                         &lk_b,
 		                                         amtail_hash("reg_ts", strlen("reg_ts")));
 		ok = ok && a && b && a->d == b->d;
 		string_free(line);

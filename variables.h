@@ -1,9 +1,15 @@
 #pragma once
 #include "parser.h"
+#include <stddef.h>
+
+typedef struct amtail_lookup_key {
+	const char *p;
+	size_t l;
+} amtail_lookup_key;
 
 typedef struct amtail_variable {
 	string *export_name;
-	char *key;
+	string *key;
 	uint8_t type;
 	uint8_t facttype;
 	uint8_t hidden;
@@ -23,7 +29,7 @@ typedef struct amtail_variable {
 	double histogram_sum;
 	uint64_t histogram_count;
 	uint8_t is_template;
-	/* Dedup for amtail_touch_record per carg->amtail_touch_seq. */
+	/* Dedup for host on_var_touched callback per carg->amtail_touch_seq. */
 	uint32_t touch_seq;
 
 	tommy_node node;
