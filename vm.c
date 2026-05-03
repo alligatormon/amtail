@@ -124,7 +124,7 @@ static void amtail_vm_set_capture_variable(alligator_ht *variables, const char *
 			if (!key_heap)
 			{
 				free(var);
-				if (lookup_heap)
+				if (lookup_key != stack_key && lookup_heap)
 					free(lookup_key);
 				return;
 			}
