@@ -1,7 +1,9 @@
 #include "common/selector.h"
 #include "variables.h"
+#include "dstructures/ht.h"
 #include "dstructures/tommy.h"
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -163,9 +165,8 @@ inline uint32_t amtail_hash(char *str, uint64_t syms)
 	}
 }
 
-void amtail_variable_free(void *funcarg, void* arg)
+static void amtail_variable_destroy(amtail_variable *var)
 {
-	amtail_variable *var = arg;
 	if (!var)
 		return;
 	if (var->export_name)
@@ -179,9 +180,43 @@ void amtail_variable_free(void *funcarg, void* arg)
 	free(var);
 }
 
+void amtail_variable_free(void *funcarg, void* arg)
+{
+	(void)funcarg;
+	amtail_variable_destroy(arg);
+}
+
+struct amtail_var_collect_ctx {
+	amtail_variable **buf;
+	size_t n;
+	size_t cap;
+};
+
+static void amtail_var_collect(void *funcarg, void *arg)
+{
+	struct amtail_var_collect_ctx *ctx = funcarg;
+	if (ctx->n >= ctx->cap) {
+		size_t ncap = ctx->cap ? ctx->cap * 2 : 8;
+		amtail_variable **nb = realloc(ctx->buf, ncap * sizeof(*nb));
+		if (!nb)
+			return;
+		ctx->buf = nb;
+		ctx->cap = ncap;
+	}
+	ctx->buf[ctx->n++] = arg;
+}
+
 void amtail_variables_free(alligator_ht *variables)
 {
-	alligator_ht_foreach_arg(variables, amtail_variable_free, NULL);
+	if (!variables)
+		return;
+	struct amtail_var_collect_ctx ctx = { NULL, 0, 0 };
+	alligator_ht_foreach_arg(variables, amtail_var_collect, &ctx);
+	for (size_t i = 0; i < ctx.n; ++i) {
+		alligator_ht_remove_existing(variables, &(ctx.buf[i]->node));
+		amtail_variable_destroy(ctx.buf[i]);
+	}
+	free(ctx.buf);
 	alligator_ht_done(variables);
 	free(variables);
 }
