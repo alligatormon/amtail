@@ -31,6 +31,12 @@ typedef struct amtail_variable {
 	uint8_t is_template;
 	/* Dedup for host on_var_touched callback per carg->amtail_touch_seq. */
 	uint32_t touch_seq;
+	/* Last emitted values to skip unchanged touched exports. */
+	uint8_t emit_initialized;
+	int64_t last_emit_i;
+	double last_emit_d;
+	uint64_t last_emit_hist_count;
+	double last_emit_hist_sum;
 
 	tommy_node node;
 } amtail_variable;

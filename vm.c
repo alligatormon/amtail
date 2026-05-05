@@ -124,7 +124,7 @@ static void amtail_vm_set_capture_variable(alligator_ht *variables, const char *
 			if (!key_heap)
 			{
 				free(var);
-				if (lookup_key != stack_key && lookup_heap)
+				if (lookup_heap)
 					free(lookup_key);
 				return;
 			}
@@ -2033,47 +2033,42 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	}
 	free(resolved_key);
 
-	if (var->type == ALLIGATOR_VARTYPE_COUNTER && left->vartype == ALLIGATOR_VARTYPE_COUNTER)
+	if (var->type == ALLIGATOR_VARTYPE_COUNTER)
 	{
-		var->i = left->li;
-		amtail_invoke_var_touched(amt_thread, var);
-		if (amtail_ll.vm > 1)
-			fprintf(stderr, "load variable %s/%s: c/c %"PRIu64"\n", var->export_name->s, var->key->s, var->i);
+		int64_t iv = 0;
+		if (amtail_vm_cast_to_int64(left, variables, &iv))
+		{
+			var->i = iv;
+			amtail_invoke_var_touched(amt_thread, var);
+			if (amtail_ll.vm > 1)
+				fprintf(stderr, "load variable %s/%s: c/* %"PRId64"\n", var->export_name->s, var->key->s, var->i);
+		}
 	}
-	else if (var->type == ALLIGATOR_VARTYPE_GAUGE && left->vartype == ALLIGATOR_VARTYPE_COUNTER)
+	else if (var->type == ALLIGATOR_VARTYPE_GAUGE)
 	{
-		var->d = left->li;
-		amtail_invoke_var_touched(amt_thread, var);
-		if (amtail_ll.vm > 1)
-			fprintf(stderr, "load variable %s/%s: g/c %lf\n", var->export_name->s, var->key->s, var->d);
-	}
-	else if (var->type == ALLIGATOR_VARTYPE_COUNTER && left->vartype == ALLIGATOR_VARTYPE_GAUGE)
-	{
-		var->i = left->ld;
-		amtail_invoke_var_touched(amt_thread, var);
-		if (amtail_ll.vm > 1)
-			fprintf(stderr, "load variable %s/%s: c/g %"PRIu64"\n", var->export_name->s, var->key->s, var->i);
-	}
-	else if (var->type == ALLIGATOR_VARTYPE_GAUGE && left->vartype == ALLIGATOR_VARTYPE_GAUGE)
-	{
-		var->d = left->ld;
-		amtail_invoke_var_touched(amt_thread, var);
-		if (amtail_ll.vm > 1) {
-			fprintf(stderr, "load variable %s/%s: g/g %lf, by %p(%"PRIu8")\n", var->export_name->s, var->key->s, var->d, var->by, var->by_count);
-			if (var->by && var->by_count)
-			{
-				for (uint64_t i = 0; i < var->by_count; ++i)
-					printf("\t\tby[%"PRIu64"] %s\n", i, var->by[i]->s);
+		double dv = 0;
+		if (amtail_vm_cast_to_double(left, variables, &dv))
+		{
+			var->d = dv;
+			amtail_invoke_var_touched(amt_thread, var);
+			if (amtail_ll.vm > 1) {
+				fprintf(stderr, "load variable %s/%s: g/* %lf, by %p(%"PRIu8")\n", var->export_name->s, var->key->s, var->d, var->by, var->by_count);
+				if (var->by && var->by_count)
+				{
+					for (uint64_t i = 0; i < var->by_count; ++i)
+						printf("\t\tby[%"PRIu64"] %s\n", i, var->by[i]->s);
+				}
 			}
 		}
 	}
 	else if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM)
 	{
-		if (left->vartype == ALLIGATOR_VARTYPE_COUNTER)
-			amtail_histogram_observe(var, (double)left->li);
-		else if (left->vartype == ALLIGATOR_VARTYPE_GAUGE)
-			amtail_histogram_observe(var, left->ld);
-		amtail_invoke_var_touched(amt_thread, var);
+		double hv = 0;
+		if (amtail_vm_cast_to_double(left, variables, &hv))
+		{
+			amtail_histogram_observe(var, hv);
+			amtail_invoke_var_touched(amt_thread, var);
+		}
 	}
 	else if (var->type == ALLIGATOR_VARTYPE_TEXT && left->vartype == ALLIGATOR_VARTYPE_TEXT &&
 	         left->ls && left->ls->s)

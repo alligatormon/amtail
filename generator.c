@@ -91,19 +91,17 @@ static void compile_regex_for_op(amtail_byteop *op, amtail_log_level amtail_ll)
 	}
 
 	/*
-	 * BRANCH may hold a pure regex block (/.../) OR an expression
-	 * (len($x)>0, /a/ + CONST, $msg =~ /.../, etc). Only precompile strict
-	 * /.../ literals to avoid feeding non-regex expressions to PCRE.
+	 * Parser uses BRANCH for pure /.../ blocks and for condition forms
+	 * like "$message /.../". The latter are not standalone regex patterns.
 	 */
-	if (op->opcode == AMTAIL_AST_OPCODE_BRANCH)
+	if (op->opcode == AMTAIL_AST_OPCODE_BRANCH &&
+	    (pattern[0] == '$' || strstr(pattern, " /") || strstr(pattern, " $")))
+		return;
+
+	/* Keep parser output intact; trim only canonical /.../ wrapper if present. */
+	if (op->opcode == AMTAIL_AST_OPCODE_BRANCH &&
+	    pattern_len >= 2 && pattern[0] == '/' && pattern[pattern_len - 1] == '/')
 	{
-		if (pattern_len < 2 || pattern[0] != '/' || pattern[pattern_len - 1] != '/')
-			return;
-		for (size_t i = 1; i + 1 < pattern_len; ++i)
-		{
-			if (pattern[i] == '/' && pattern[i - 1] != '\\')
-				return;
-		}
 		++pattern;
 		pattern_len -= 2;
 	}
