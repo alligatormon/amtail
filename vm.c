@@ -26,165 +26,103 @@ static void amtail_invoke_var_touched(amtail_thread *t, amtail_variable *v)
 
 void (*amtail_vmfunc[256])(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll);
 void amtail_vmstack_push(amtail_thread *amt_thread, amtail_byteop *byte_ops);
-static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables);
-static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *variables);
+static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables, amtail_thread *t);
+static void amtail_vm_captures_reset(amtail_thread *t);
+static int amtail_vm_resolve_capture_token(const char *key, size_t token_len, amtail_thread *t,
+	const char **emit, size_t *emit_len);
+static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *variables, amtail_thread *t);
 
-/* Copy capture slice into var->s; grows buffer in place (no strnlen, no free+realloc churn). */
-static int amtail_vm_capture_assign_text(amtail_variable *var, const char *value, size_t value_len)
+static void amtail_vm_captures_reset(amtail_thread *t)
 {
-	const size_t need = value_len + 1;
-
-	if (!var->s)
-	{
-		var->s = malloc(sizeof(*var->s));
-		if (!var->s)
-			return 0;
-		size_t cap = need < 32 ? 32 : need;
-		var->s->s = malloc(cap);
-		if (!var->s->s)
-		{
-			free(var->s);
-			var->s = NULL;
-			return 0;
-		}
-		var->s->m = cap;
-		memcpy(var->s->s, value, value_len);
-		var->s->s[value_len] = '\0';
-		var->s->l = value_len;
-		return 1;
-	}
-
-	if (var->s->m >= need)
-	{
-		memcpy(var->s->s, value, value_len);
-		var->s->s[value_len] = '\0';
-		var->s->l = value_len;
-		return 1;
-	}
-
-	size_t cap = need;
-	if (var->s->m && cap < var->s->m * 2)
-		cap = var->s->m * 2;
-	char *ns = realloc(var->s->s, cap);
-	if (!ns)
-		return 0;
-	var->s->s = ns;
-	var->s->m = cap;
-	memcpy(var->s->s, value, value_len);
-	var->s->s[value_len] = '\0';
-	var->s->l = value_len;
-	return 1;
+	if (!t)
+		return;
+	t->capture_count = 0;
+	t->named_capture_count = 0;
 }
 
-static void amtail_vm_set_capture_variable(alligator_ht *variables, const char *name, size_t name_len, const char *value, size_t value_len)
+static void amtail_vm_apply_numbered_captures(amtail_thread *t, char *line, uint64_t line_size, const int *ovector, int count)
 {
-	if (!variables || !name || !name_len)
+	if (!t || !line || !ovector || count <= 1)
 		return;
 
-	enum { KEY_STACK_MAX = 256 };
-	char stack_key[KEY_STACK_MAX];
-	char *lookup_key;
-	int lookup_heap = 0;
+	int max_group = count - 1;
+	if (max_group >= AMTAIL_CAPTURE_MAX)
+		max_group = AMTAIL_CAPTURE_MAX - 1;
+	t->capture_count = (uint8_t)max_group;
 
-	if (name_len + 2 <= KEY_STACK_MAX)
-	{
-		stack_key[0] = '$';
-		memcpy(stack_key + 1, name, name_len);
-		stack_key[name_len + 1] = '\0';
-		lookup_key = stack_key;
-	}
-	else
-	{
-		lookup_key = calloc(1, name_len + 2);
-		if (!lookup_key)
-			return;
-		lookup_key[0] = '$';
-		memcpy(lookup_key + 1, name, name_len);
-		lookup_heap = 1;
-	}
-
-	uint32_t name_hash = amtail_hash(lookup_key, name_len + 1);
-	amtail_lookup_key lk = { lookup_key, name_len + 1 };
-	//printf("amtail_vm_set_capture_variable lookup_key: %s, name_hash: %u\n", lookup_key, name_hash);
-	amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, name_hash);
-	//printf("amtail_vm_set_capture_variable var: %p\n", var);
-	if (!var)
-	{
-		var = calloc(1, sizeof(*var));
-		if (!var)
-		{
-			if (lookup_key != stack_key && lookup_heap)
-				free(lookup_key);
-			return;
-		}
-		var->hidden = 1;
-		var->type = ALLIGATOR_VARTYPE_TEXT;
-		if (lookup_key == stack_key)
-		{
-			char *key_heap = malloc(name_len + 2);
-			if (!key_heap)
-			{
-				free(var);
-				if (lookup_key != stack_key && lookup_heap)
-					free(lookup_key);
-				return;
-			}
-			memcpy(key_heap, stack_key, name_len + 2);
-			var->key = string_init_dup(key_heap);
-			free(key_heap);
-		}
-		else
-		{
-			var->key = malloc(sizeof(string));
-			if (!var->key)
-			{
-				free(var);
-				if (lookup_key != stack_key && lookup_heap)
-					free(lookup_key);
-				return;
-			}
-			var->key->s = lookup_key;
-			var->key->l = name_len + 1;
-			var->key->m = name_len + 2;
-			lookup_heap = 0;
-		}
-		var->export_name = string_string_init_dup(var->key);
-		alligator_ht_insert_nolock(variables, &(var->node), var, name_hash);
-	}
-	else
-	{
-		if (lookup_key != stack_key && lookup_heap)
-			free(lookup_key);
-		var->type = ALLIGATOR_VARTYPE_TEXT;
-	}
-
-	(void)amtail_vm_capture_assign_text(var, value, value_len);
-}
-
-static void amtail_vm_apply_numbered_captures(char *line, uint64_t line_size, alligator_ht *variables, const int *ovector, int count)
-{
-	if (!line || !variables || !ovector || count <= 1)
-		return;
-
-	for (int i = 1; i < count; ++i)
+	for (int i = 1; i <= max_group; ++i)
 	{
 		int start = ovector[2 * i];
 		int end = ovector[2 * i + 1];
 		if (start < 0 || end < start || (uint64_t)end > line_size)
+		{
+			t->captures[i].ptr = NULL;
+			t->captures[i].len = 0;
 			continue;
-
-		char idx[16];
-		int n = snprintf(idx, sizeof(idx), "%d", i);
-		if (n <= 0)
-			continue;
-		amtail_vm_set_capture_variable(variables, idx, (size_t)n, line + start, (size_t)(end - start));
+		}
+		t->captures[i].ptr = line + start;
+		t->captures[i].len = (uint32_t)(end - start);
 	}
 }
 
-static void amtail_vm_apply_named_captures(regex_match *rematch, char *line, uint64_t line_size, alligator_ht *variables, const int *ovector, int count)
+static int amtail_vm_resolve_capture_token(const char *key, size_t token_len, amtail_thread *t,
+	const char **emit, size_t *emit_len)
 {
-	if (!rematch || !line || !line_size || !variables || !rematch->regex_compiled || !ovector || count <= 0)
+	if (!key || !token_len || !t || !emit || !emit_len)
+		return 0;
+
+	const char *p = key;
+	size_t l = token_len;
+	if (p[0] == '$' && l > 1)
+	{
+		++p;
+		--l;
+	}
+	if (!l)
+		return 0;
+
+	unsigned idx = 0;
+	int all_digits = 1;
+	for (size_t i = 0; i < l; ++i)
+	{
+		if (p[i] < '0' || p[i] > '9')
+		{
+			all_digits = 0;
+			break;
+		}
+		idx = idx * 10u + (unsigned)(p[i] - '0');
+	}
+	if (all_digits && idx > 0 && idx < AMTAIL_CAPTURE_MAX && idx <= t->capture_count)
+	{
+		if (t->captures[idx].ptr && t->captures[idx].len)
+		{
+			*emit = t->captures[idx].ptr;
+			*emit_len = t->captures[idx].len;
+			return 1;
+		}
+		return 0;
+	}
+
+	for (uint8_t i = 0; i < t->named_capture_count; ++i)
+	{
+		if (t->named_captures[i].name_len == l &&
+		    memcmp(t->named_captures[i].name, p, l) == 0 &&
+		    t->named_captures[i].slice.ptr && t->named_captures[i].slice.len)
+		{
+			*emit = t->named_captures[i].slice.ptr;
+			*emit_len = t->named_captures[i].slice.len;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static void amtail_vm_apply_named_captures(amtail_thread *t, regex_match *rematch, char *line, uint64_t line_size, const int *ovector, int count)
+{
+	if (!t || !rematch || !line || !line_size || !rematch->regex_compiled || !ovector || count <= 0)
 		return;
+
+	t->named_capture_count = 0;
 
 	int namecount = rematch->pcre_name_count;
 	int entry_size = rematch->pcre_name_entry_size;
@@ -212,16 +150,23 @@ static void amtail_vm_apply_named_captures(regex_match *rematch, char *line, uin
 		if (!gnlen)
 			continue;
 
-		amtail_vm_set_capture_variable(variables, group_name, gnlen, line + start, (size_t)(end - start));
+		if (t->named_capture_count >= AMTAIL_CAPTURE_MAX)
+			break;
+		amtail_named_capture_slot *slot = &t->named_captures[t->named_capture_count++];
+		slot->name = group_name;
+		slot->name_len = (uint8_t)gnlen;
+		slot->slice.ptr = line + start;
+		slot->slice.len = (uint32_t)(end - start);
 	}
 }
 
-static void amtail_vm_apply_regex_captures(regex_match *rematch, char *line, uint64_t line_size, alligator_ht *variables, const int *ovector, int count)
+static void amtail_vm_apply_regex_captures(amtail_thread *t, regex_match *rematch, char *line, uint64_t line_size, const int *ovector, int count)
 {
-	amtail_vm_apply_numbered_captures(line, line_size, variables, ovector, count);
-	if (!rematch || !line || !line_size || !variables || !rematch->regex_compiled || !ovector || count <= 0)
+	amtail_vm_apply_numbered_captures(t, line, line_size, ovector, count);
+	if (!rematch || !line || !rematch->regex_compiled || !ovector || count <= 0)
 		return;
-	amtail_vm_apply_named_captures(rematch, line, line_size, variables, ovector, count);
+	if (rematch->pcre_name_count > 0)
+		amtail_vm_apply_named_captures(t, rematch, line, line_size, ovector, count);
 }
 
 static int amtail_histogram_init(amtail_variable *var)
@@ -364,14 +309,14 @@ static void amtail_vm_push_bool(amtail_thread *amt_thread, int value)
 	new->li = value ? 1 : 0;
 }
 
-static int amtail_vm_compare_equal(amtail_byteop *left, amtail_byteop *right, alligator_ht *variables)
+static int amtail_vm_compare_equal(amtail_byteop *left, amtail_byteop *right, alligator_ht *variables, amtail_thread *t)
 {
 	double l = 0, r = 0;
 	if (amtail_vm_get_number(left, &l) && amtail_vm_get_number(right, &r))
 		return l == r;
 
-	char *ls = amtail_vm_resolve_string(left, variables);
-	char *rs = amtail_vm_resolve_string(right, variables);
+	char *ls = amtail_vm_resolve_string(left, variables, t);
+	char *rs = amtail_vm_resolve_string(right, variables, t);
 	if (!ls || !rs)
 	{
 		free(ls);
@@ -452,7 +397,7 @@ static int amtail_vm_extract_binary_operands(const char *expr, char **lhs, char 
 	return 1;
 }
 
-static int amtail_vm_token_to_number(const char *token, alligator_ht *variables, double *out)
+static int amtail_vm_token_to_number(const char *token, alligator_ht *variables, amtail_thread *t, double *out)
 {
 	if (!token || !out)
 		return 0;
@@ -465,7 +410,7 @@ static int amtail_vm_token_to_number(const char *token, alligator_ht *variables,
 		return 1;
 	}
 
-	char *resolved = amtail_vm_lookup_variable_string(token, variables);
+	char *resolved = amtail_vm_lookup_variable_string(token, variables, t);
 	if (!resolved)
 		return 0;
 	end = NULL;
@@ -478,7 +423,7 @@ static int amtail_vm_token_to_number(const char *token, alligator_ht *variables,
 	return 1;
 }
 
-static char* amtail_vm_token_to_string(const char *token, alligator_ht *variables)
+static char* amtail_vm_token_to_string(const char *token, alligator_ht *variables, amtail_thread *t)
 {
 	if (!token)
 		return NULL;
@@ -489,14 +434,14 @@ static char* amtail_vm_token_to_string(const char *token, alligator_ht *variable
 	     (token[0] == '\'' && token[len - 1] == '\'')))
 		return strndup(token + 1, len - 2);
 
-	char *resolved = amtail_vm_lookup_variable_string(token, variables);
+	char *resolved = amtail_vm_lookup_variable_string(token, variables, t);
 	if (resolved)
 		return resolved;
 
 	return strdup(token);
 }
 
-static int amtail_vm_cast_to_int64(amtail_byteop *val, alligator_ht *variables, int64_t *out)
+static int amtail_vm_cast_to_int64(amtail_byteop *val, alligator_ht *variables, amtail_thread *t, int64_t *out)
 {
 	if (!val || !out)
 		return 0;
@@ -508,7 +453,7 @@ static int amtail_vm_cast_to_int64(amtail_byteop *val, alligator_ht *variables, 
 		return 1;
 	}
 
-	char *s = amtail_vm_resolve_string(val, variables);
+	char *s = amtail_vm_resolve_string(val, variables, t);
 	if (!s)
 		return 0;
 
@@ -525,7 +470,7 @@ static int amtail_vm_cast_to_int64(amtail_byteop *val, alligator_ht *variables, 
 	return 1;
 }
 
-static int amtail_vm_cast_to_double(amtail_byteop *val, alligator_ht *variables, double *out)
+static int amtail_vm_cast_to_double(amtail_byteop *val, alligator_ht *variables, amtail_thread *t, double *out)
 {
 	if (!val || !out)
 		return 0;
@@ -537,7 +482,7 @@ static int amtail_vm_cast_to_double(amtail_byteop *val, alligator_ht *variables,
 		return 1;
 	}
 
-	char *s = amtail_vm_resolve_string(val, variables);
+	char *s = amtail_vm_resolve_string(val, variables, t);
 	if (!s)
 		return 0;
 
@@ -566,7 +511,7 @@ static char* amtail_vm_strdup_trim_quotes(const char *src)
 	return strdup(src);
 }
 
-static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables)
+static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables, amtail_thread *t)
 {
 	if (!op)
 		return NULL;
@@ -588,6 +533,18 @@ static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables
 
 	if (op->export_name && op->export_name->s)
 	{
+		const char *emit = NULL;
+		size_t emit_len = 0;
+		if (t && amtail_vm_resolve_capture_token(op->export_name->s, op->export_name->l, t, &emit, &emit_len) && emit_len)
+		{
+			char *copy = malloc(emit_len + 1);
+			if (!copy)
+				return NULL;
+			memcpy(copy, emit, emit_len);
+			copy[emit_len] = '\0';
+			return copy;
+		}
+
 		if (variables)
 		{
 			amtail_lookup_key lk = { op->export_name->s, op->export_name->l };
@@ -622,11 +579,15 @@ static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables
 }
 
 /* Writable key[token_len]==0; may memmove key for '$' strip. Borrowed *emit from var->s when no heap. */
-static int amtail_vm_resolve_metric_token(char *key, size_t token_len, alligator_ht *variables,
+static int amtail_vm_resolve_metric_token(char *key, size_t token_len, amtail_thread *t, alligator_ht *variables,
 	const char **emit, size_t *emit_len, int *emit_heap_allocated)
 {
 	if (!variables || !token_len)
 		return 0;
+
+	*emit_heap_allocated = 0;
+	if (t && amtail_vm_resolve_capture_token(key, token_len, t, emit, emit_len))
+		return 1;
 
 	amtail_lookup_key lk = { key, token_len };
 	uint32_t h = amtail_hash((char*)key, token_len);
@@ -641,7 +602,6 @@ static int amtail_vm_resolve_metric_token(char *key, size_t token_len, alligator
 		var = alligator_ht_search_nolock(variables, amtail_variable_compare, &lk, h);
 	}
 
-	*emit_heap_allocated = 0;
 	if (!var)
 		return 0;
 
@@ -682,9 +642,24 @@ static int amtail_vm_resolve_metric_token(char *key, size_t token_len, alligator
 	return 0;
 }
 
-static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *variables)
+static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *variables, amtail_thread *t)
 {
-	if (!name || !*name || !variables)
+	if (!name || !*name)
+		return NULL;
+
+	const char *emit = NULL;
+	size_t emit_len = 0;
+	if (t && amtail_vm_resolve_capture_token(name, strlen(name), t, &emit, &emit_len) && emit_len)
+	{
+		char *copy = malloc(emit_len + 1);
+		if (!copy)
+			return NULL;
+		memcpy(copy, emit, emit_len);
+		copy[emit_len] = '\0';
+		return copy;
+	}
+
+	if (!variables)
 		return NULL;
 
 	size_t name_len = strlen(name);
@@ -722,7 +697,7 @@ static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *va
 }
 
 /* raw_len: logical length (e.g. string->l); 0 means use strlen(raw_key). */
-static char *amtail_vm_interpolate_metric_key(const char *raw_key, size_t raw_len, alligator_ht *variables)
+static char *amtail_vm_interpolate_metric_key(const char *raw_key, size_t raw_len, amtail_thread *t, alligator_ht *variables)
 {
 	if (!raw_key)
 		return NULL;
@@ -775,7 +750,7 @@ static char *amtail_vm_interpolate_metric_key(const char *raw_key, size_t raw_le
 				const char *emit;
 				size_t emit_len;
 				int emit_heap = 0;
-				if (!amtail_vm_resolve_metric_token(key, token_len, variables, &emit, &emit_len, &emit_heap)) {
+				if (!amtail_vm_resolve_metric_token(key, token_len, t, variables, &emit, &emit_len, &emit_heap)) {
 					emit = literal;
 					emit_len = token_len;
 				}
@@ -904,7 +879,7 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 
 	char *resolved_key = NULL;
 	if (byte_ops->metric_key_interpolate)
-		resolved_key = amtail_vm_interpolate_metric_key(byte_ops->export_name->s, byte_ops->export_name->l, variables);
+		resolved_key = amtail_vm_interpolate_metric_key(byte_ops->export_name->s, byte_ops->export_name->l, amt_thread, variables);
 	char *lookup_key = resolved_key ? resolved_key : byte_ops->export_name->s;
 	size_t lookup_len = strlen(lookup_key);
 	amtail_lookup_key lk = { lookup_key, lookup_len };
@@ -941,6 +916,17 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		return;
 	}
 	free(resolved_key);
+
+	{
+		const char *emit = NULL;
+		size_t emit_len = 0;
+		if (amtail_vm_resolve_capture_token(byte_ops->export_name->s, byte_ops->export_name->l, amt_thread, &emit, &emit_len) && emit_len)
+		{
+			resolved->vartype = ALLIGATOR_VARTYPE_TEXT;
+			resolved->ls = string_init_alloc((char*)emit, emit_len);
+			return;
+		}
+	}
 
 	/* Fallback for inline literals emitted by parser (numeric or quoted string).
 	 * The parser pushes operand tokens as VAR nodes whose export_name is the raw
@@ -994,7 +980,7 @@ static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byt
 			amtail_vm_free_tempop(cond);
 			return rc;
 		}
-		char *s = amtail_vm_resolve_string(cond, variables);
+		char *s = amtail_vm_resolve_string(cond, variables, amt_thread);
 		int rc = s && *s;
 		free(s);
 		amtail_vm_free_tempop(cond);
@@ -1007,13 +993,13 @@ static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byt
 	{
 		double ln = 0, rn = 0;
 		int matched = 0;
-		if (amtail_vm_token_to_number(lhs, variables, &ln) &&
-		    amtail_vm_token_to_number(rhs, variables, &rn))
+		if (amtail_vm_token_to_number(lhs, variables, amt_thread, &ln) &&
+		    amtail_vm_token_to_number(rhs, variables, amt_thread, &rn))
 			matched = (ln == rn);
 		else
 		{
-			char *ls = amtail_vm_token_to_string(lhs, variables);
-			char *rs = amtail_vm_token_to_string(rhs, variables);
+			char *ls = amtail_vm_token_to_string(lhs, variables, amt_thread);
+			char *rs = amtail_vm_token_to_string(rhs, variables, amt_thread);
 			matched = (ls && rs && strcmp(ls, rs) == 0);
 			free(ls);
 			free(rs);
@@ -1039,7 +1025,7 @@ uint64_t amtail_vmfunc_branch(amtail_thread *amt_thread, amtail_byteop *byte_ops
 	int ovector[240];
 	int match = amtail_regex_exec_with_ovector(byte_ops->re_match, logline->s + offset, line_size, amtail_ll, ovector, 240);
 	if (match)
-		amtail_vm_apply_regex_captures(byte_ops->re_match, logline->s + offset, line_size, variables, ovector, match);
+		amtail_vm_apply_regex_captures(amt_thread, byte_ops->re_match, logline->s + offset, line_size, ovector, match);
 	//fprintf(stderr, "branch pcre '%s' (jmp %"PRIu64", res: %"PRIu8" with logline '%p'\n", byte_ops->export_name->s+1, byte_ops->right_opcounter, match, logline->s);
 	if (match)
 		return 0;
@@ -1271,14 +1257,14 @@ void amtail_vmfunc_cmp_eq(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	{
 		double ln = 0, rn = 0;
 		int result = 0;
-		if (amtail_vm_token_to_number(lhs, variables, &ln) && amtail_vm_token_to_number(rhs, variables, &rn))
+		if (amtail_vm_token_to_number(lhs, variables, amt_thread, &ln) && amtail_vm_token_to_number(rhs, variables, amt_thread, &rn))
 		{
 			result = ln == rn;
 		}
 		else
 		{
-			char *ls = amtail_vm_token_to_string(lhs, variables);
-			char *rs = amtail_vm_token_to_string(rhs, variables);
+			char *ls = amtail_vm_token_to_string(lhs, variables, amt_thread);
+			char *rs = amtail_vm_token_to_string(rhs, variables, amt_thread);
 			result = (ls && rs && strcmp(ls, rs) == 0);
 			free(ls);
 			free(rs);
@@ -1293,7 +1279,7 @@ void amtail_vmfunc_cmp_eq(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
 	if (left && right)
 	{
-		amtail_vm_push_bool(amt_thread, amtail_vm_compare_equal(left, right, variables));
+		amtail_vm_push_bool(amt_thread, amtail_vm_compare_equal(left, right, variables, amt_thread));
 		return;
 	}
 
@@ -1308,14 +1294,14 @@ void amtail_vmfunc_cmp_ne(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	{
 		double ln = 0, rn = 0;
 		int result = 1;
-		if (amtail_vm_token_to_number(lhs, variables, &ln) && amtail_vm_token_to_number(rhs, variables, &rn))
+		if (amtail_vm_token_to_number(lhs, variables, amt_thread, &ln) && amtail_vm_token_to_number(rhs, variables, amt_thread, &rn))
 		{
 			result = ln != rn;
 		}
 		else
 		{
-			char *ls = amtail_vm_token_to_string(lhs, variables);
-			char *rs = amtail_vm_token_to_string(rhs, variables);
+			char *ls = amtail_vm_token_to_string(lhs, variables, amt_thread);
+			char *rs = amtail_vm_token_to_string(rhs, variables, amt_thread);
 			result = !(ls && rs && strcmp(ls, rs) == 0);
 			free(ls);
 			free(rs);
@@ -1330,7 +1316,7 @@ void amtail_vmfunc_cmp_ne(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	amtail_byteop *left = amtail_vmstack_pop(amt_thread);
 	if (left && right)
 	{
-		amtail_vm_push_bool(amt_thread, !amtail_vm_compare_equal(left, right, variables));
+		amtail_vm_push_bool(amt_thread, !amtail_vm_compare_equal(left, right, variables, amt_thread));
 		return;
 	}
 
@@ -1371,7 +1357,7 @@ void amtail_vmfunc_match(amtail_thread *amt_thread, amtail_byteop *byte_ops, all
 	int ovector[240];
 	int matched = amtail_regex_exec_with_ovector(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size, amtail_ll, ovector, 240);
 	if (matched)
-		amtail_vm_apply_regex_captures(byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size, variables, ovector, matched);
+		amtail_vm_apply_regex_captures(amt_thread, byte_ops->re_match, amt_thread->line_ptr, amt_thread->line_size, ovector, matched);
 	amtail_vm_push_bool(amt_thread, matched ? 1 : 0);
 }
 
@@ -1393,7 +1379,7 @@ void amtail_vmfunc_cast_int(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 		return;
 
 	int64_t iv = 0;
-	int ok = amtail_vm_cast_to_int64(val, variables, &iv);
+	int ok = amtail_vm_cast_to_int64(val, variables, amt_thread, &iv);
 	amtail_vm_free_tempop(val);
 	if (!ok)
 		return;
@@ -1411,7 +1397,7 @@ void amtail_vmfunc_cast_float(amtail_thread *amt_thread, amtail_byteop *byte_ops
 	if (!val)
 		return;
 	double v = 0;
-	int ok = amtail_vm_cast_to_double(val, variables, &v);
+	int ok = amtail_vm_cast_to_double(val, variables, amt_thread, &v);
 	amtail_vm_free_tempop(val);
 	if (!ok)
 		return;
@@ -1443,7 +1429,7 @@ void amtail_vmfunc_cast_string(amtail_thread *amt_thread, amtail_byteop *byte_op
 	if (!val)
 		return;
 
-	char *s = amtail_vm_resolve_string(val, variables);
+	char *s = amtail_vm_resolve_string(val, variables, amt_thread);
 	amtail_vm_free_tempop(val);
 	if (!s)
 		return;
@@ -1466,12 +1452,12 @@ void amtail_vmfunc_fn_strtol(amtail_thread *amt_thread, amtail_byteop *byte_ops,
 	if (base_op)
 	{
 		int64_t parsed_base = 0;
-		if (amtail_vm_cast_to_int64(base_op, variables, &parsed_base) && parsed_base >= 2 && parsed_base <= 36)
+		if (amtail_vm_cast_to_int64(base_op, variables, amt_thread, &parsed_base) && parsed_base >= 2 && parsed_base <= 36)
 			base = parsed_base;
 		amtail_vm_free_tempop(base_op);
 	}
 
-	char *s = amtail_vm_resolve_string(val, variables);
+	char *s = amtail_vm_resolve_string(val, variables, amt_thread);
 	amtail_vm_free_tempop(val);
 	if (!s)
 		return;
@@ -1497,7 +1483,7 @@ void amtail_vmfunc_fn_len(amtail_thread *amt_thread, amtail_byteop *byte_ops, al
 	if (!val)
 		return;
 
-	char *s = amtail_vm_resolve_string(val, variables);
+	char *s = amtail_vm_resolve_string(val, variables, amt_thread);
 	amtail_vm_free_tempop(val);
 	if (!s)
 		return;
@@ -1518,7 +1504,7 @@ void amtail_vmfunc_fn_tolower(amtail_thread *amt_thread, amtail_byteop *byte_ops
 	if (!val)
 		return;
 
-	char *s = amtail_vm_resolve_string(val, variables);
+	char *s = amtail_vm_resolve_string(val, variables, amt_thread);
 	amtail_vm_free_tempop(val);
 	if (!s)
 		return;
@@ -1665,8 +1651,8 @@ void amtail_vmfunc_fn_strptime(amtail_thread *amt_thread, amtail_byteop *byte_op
 		fmt_op = NULL;
 	}
 
-	char *value = amtail_vm_resolve_string(val_op, variables);
-	char *fmt = fmt_op ? amtail_vm_resolve_string(fmt_op, variables) : NULL;
+	char *value = amtail_vm_resolve_string(val_op, variables, amt_thread);
+	char *fmt = fmt_op ? amtail_vm_resolve_string(fmt_op, variables, amt_thread) : NULL;
 	amtail_vm_free_tempop(val_op);
 	amtail_vm_free_tempop(fmt_op);
 
@@ -1711,11 +1697,11 @@ void amtail_vmfunc_fn_settime(amtail_thread *amt_thread, amtail_byteop *byte_ops
 	}
 
 	double epoch = 0;
-	int ok = amtail_vm_cast_to_double(val, variables, &epoch);
+	int ok = amtail_vm_cast_to_double(val, variables, amt_thread, &epoch);
 	if (!ok)
 	{
 		/* Allow "1709999999" style text to flow through. */
-		char *s = amtail_vm_resolve_string(val, variables);
+		char *s = amtail_vm_resolve_string(val, variables, amt_thread);
 		if (s)
 		{
 			epoch = amtail_vm_parse_epoch_string(s);
@@ -1906,9 +1892,9 @@ void amtail_vmfunc_fn_subst(amtail_thread *amt_thread, amtail_byteop *byte_ops, 
 		return;
 	}
 
-	char *val = amtail_vm_resolve_string(val_op, variables);
-	char *newstr = amtail_vm_resolve_string(new_op, variables);
-	char *oldstr = amtail_vm_resolve_string(old_op, variables);
+	char *val = amtail_vm_resolve_string(val_op, variables, amt_thread);
+	char *newstr = amtail_vm_resolve_string(new_op, variables, amt_thread);
+	char *oldstr = amtail_vm_resolve_string(old_op, variables, amt_thread);
 	amtail_vm_free_tempop(val_op);
 	amtail_vm_free_tempop(new_op);
 	amtail_vm_free_tempop(old_op);
@@ -1981,7 +1967,7 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 
 	char *resolved_key = NULL;
 	if (right->metric_key_interpolate)
-		resolved_key = amtail_vm_interpolate_metric_key(right->export_name->s, right->export_name->l, variables);
+		resolved_key = amtail_vm_interpolate_metric_key(right->export_name->s, right->export_name->l, amt_thread, variables);
 	const char *lookup_key = resolved_key ? resolved_key : right->export_name->s;
 	size_t lookup_len = strlen(lookup_key);
 	amtail_lookup_key lk = { lookup_key, lookup_len };
@@ -2065,7 +2051,7 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	if (var->type == ALLIGATOR_VARTYPE_COUNTER)
 	{
 		int64_t iv = 0;
-		if (amtail_vm_cast_to_int64(left, variables, &iv))
+		if (amtail_vm_cast_to_int64(left, variables, amt_thread, &iv))
 		{
 			var->i = iv;
 			amtail_invoke_var_touched(amt_thread, var);
@@ -2076,7 +2062,7 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	else if (var->type == ALLIGATOR_VARTYPE_GAUGE)
 	{
 		double dv = 0;
-		if (amtail_vm_cast_to_double(left, variables, &dv))
+		if (amtail_vm_cast_to_double(left, variables, amt_thread, &dv))
 		{
 			var->d = dv;
 			amtail_invoke_var_touched(amt_thread, var);
@@ -2093,7 +2079,7 @@ void amtail_vmfunc_runcalc(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	else if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM)
 	{
 		double hv = 0;
-		if (amtail_vm_cast_to_double(left, variables, &hv))
+		if (amtail_vm_cast_to_double(left, variables, amt_thread, &hv))
 		{
 			amtail_histogram_observe(var, hv);
 			amtail_invoke_var_touched(amt_thread, var);
@@ -2140,7 +2126,7 @@ static amtail_variable *amtail_vm_lookup_or_create_metric(amtail_thread *amt_thr
 
 	if (interpolate)
 	{
-		resolved_key = amtail_vm_interpolate_metric_key(raw_name, raw_len, variables);
+		resolved_key = amtail_vm_interpolate_metric_key(raw_name, raw_len, amt_thread, variables);
 		if (resolved_key)
 		{
 			lookup_key = resolved_key;
@@ -2580,6 +2566,7 @@ int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string*
 		 * line-scoped (established by settime/strptime during line processing). */
 		amt_thread->timestamp_set = 0;
 		amt_thread->timestamp_value = 0;
+		amtail_vm_captures_reset(amt_thread);
 		amtail_vm_stack_clear(amt_thread);
 		for (uint64_t i = 0; i < size; ++i)
 		{

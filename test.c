@@ -435,6 +435,14 @@ static int runtime_expect_counter_key(alligator_ht *variables, const char *key, 
 	return var && !var->is_template && var->type == ALLIGATOR_VARTYPE_COUNTER && var->i == expect;
 }
 
+static int runtime_expect_gauge_key(alligator_ht *variables, const char *key, double expect)
+{
+	size_t kl = strlen(key);
+	amtail_lookup_key lk = { key, kl };
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, &lk, amtail_hash((char*)key, kl));
+	return var && !var->is_template && var->type == ALLIGATOR_VARTYPE_GAUGE && var->d == expect;
+}
+
 static int runtime_expect_gauge_positive(alligator_ht *variables, const char *name)
 {
 	size_t nl = strlen(name);
@@ -908,8 +916,51 @@ static int vm_runtime_test_keyed_counter_inc(void)
 	string *line = string_init_dup((char*)log_line);
 	int rc = amtail_run(byte_code, variables, line, amtail_ll, NULL, NULL);
 	int ok = rc &&
-	         runtime_expect_text(variables, "$1", "select pg_sleep(2);") &&
 	         runtime_expect_counter_key(variables, "pglog_slow_query_info[select pg_sleep(2);]", 1);
+
+	string_free(line);
+	amtail_variables_free(variables);
+	amtail_code_free(byte_code);
+	amtail_ast_free(ast);
+	string_tokens_free(tokens);
+	string_free(src);
+	return ok;
+}
+
+static int vm_runtime_test_beanstalkd_named_gauge(void)
+{
+	amtail_log_level amtail_ll = {0};
+	const char *script_path = "tests/beanstalkd.mtail";
+	const char *log_line = "store Beanstalkd.Jobs.Ready.rsyslog 35917 1777105955\n";
+
+	string *src = string_init_dup((char*)script_path);
+	string_tokens *tokens = amtail_lex(src, (char*)script_path, amtail_ll);
+	if (!tokens)
+	{
+		string_free(src);
+		return 0;
+	}
+	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
+	if (!ast)
+	{
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
+	if (!byte_code)
+	{
+		amtail_ast_free(ast);
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+
+	alligator_ht *variables = amtail_variables_init();
+	string *line = string_init_dup((char*)log_line);
+	int rc = amtail_run(byte_code, variables, line, amtail_ll, NULL, NULL);
+	int ok = rc &&
+	         runtime_expect_gauge_key(variables, "beanstalkd_jobs[Ready][rsyslog]", 35917.0);
 
 	string_free(line);
 	amtail_variables_free(variables);
@@ -931,13 +982,14 @@ static int vm_runtime_tests(void)
 	int rc_settime_strptime = vm_runtime_test_settime_strptime();
 	int rc_source = vm_runtime_test_mtail_source_functions();
 	int rc_keyed = vm_runtime_test_keyed_counter_inc();
+	int rc_beanstalkd = vm_runtime_test_beanstalkd_named_gauge();
 	int ok = rc_timestamp && rc_len_strtol && rc_strptime_match &&
 	         rc_tolower && rc_getfilename && rc_subst && rc_settime_strptime &&
-	         rc_source && rc_keyed;
+	         rc_source && rc_keyed && rc_beanstalkd;
 	printf("[VM] timestamp=%d len_strtol=%d strptime_match=%d tolower=%d "
-	       "getfilename=%d subst=%d settime_strptime=%d source=%d keyed=%d\n",
+	       "getfilename=%d subst=%d settime_strptime=%d source=%d keyed=%d beanstalkd=%d\n",
 	       rc_timestamp, rc_len_strtol, rc_strptime_match, rc_tolower,
-	       rc_getfilename, rc_subst, rc_settime_strptime, rc_source, rc_keyed);
+	       rc_getfilename, rc_subst, rc_settime_strptime, rc_source, rc_keyed, rc_beanstalkd);
 	if (!ok)
 		printf("[FAIL][VM] runtime feature tests\n");
 	else

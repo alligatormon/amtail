@@ -2,6 +2,18 @@
 #include "generator.h"
 #include "variables.h"
 #define AMTAIL_VM_STACK_SIZE 1024
+#define AMTAIL_CAPTURE_MAX 64
+
+typedef struct amtail_capture_slice {
+	const char *ptr;
+	uint32_t len;
+} amtail_capture_slice;
+
+typedef struct amtail_named_capture_slot {
+	const char *name;
+	uint8_t name_len;
+	amtail_capture_slice slice;
+} amtail_named_capture_slot;
 
 typedef struct amtail_touch_callbacks {
 	void *userdata;
@@ -24,6 +36,11 @@ typedef struct amtail_thread {
     const char *filename;
     /* Active for the current amtail_run/amtail_run_file; cleared before return. */
     amtail_touch_callbacks touch;
+    /* Line-scoped regex captures (pointers into line_ptr; reset each log line). */
+    uint8_t capture_count;
+    amtail_capture_slice captures[AMTAIL_CAPTURE_MAX];
+    uint8_t named_capture_count;
+    amtail_named_capture_slot named_captures[AMTAIL_CAPTURE_MAX];
 } amtail_thread;
 
 amtail_thread *amtail_thread_init(void);

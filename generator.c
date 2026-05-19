@@ -61,6 +61,53 @@ static int amtail_export_name_has_metric_template(const string *sn)
 	return 0;
 }
 
+/* Skip partial / unconcatenated patterns the parser emits before '+' folding. */
+static int amtail_regex_pattern_compilable(const char *pattern, size_t pattern_len)
+{
+	if (!pattern || !pattern_len)
+		return 0;
+
+	if (pattern[0] == '$' || pattern[0] == '@')
+		return 0;
+	/* Mtail pattern concatenation uses spaced '+', not '+' inside (?:...) or (.+). */
+	if (strstr(pattern, " + "))
+		return 0;
+	if (strstr(pattern, " $"))
+		return 0;
+	if (strstr(pattern, "MATCH_") || strstr(pattern, "+ MATCH_") ||
+	    strstr(pattern, "+ IP") || strstr(pattern, "/ +") || strstr(pattern, "+ /"))
+		return 0;
+
+	/* Decorator / label names, not regex bodies (e.g. "syslog"). */
+	{
+		size_t i;
+		for (i = 0; i < pattern_len; ++i) {
+			char c = pattern[i];
+			if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			    (c >= '0' && c <= '9') || c == '_')
+				continue;
+			break;
+		}
+		if (i >= pattern_len)
+			return 0;
+	}
+
+	int depth = 0;
+	for (size_t i = 0; i < pattern_len; ++i) {
+		if (pattern[i] == '(')
+			++depth;
+		else if (pattern[i] == ')') {
+			--depth;
+			if (depth < 0)
+				return 0;
+		}
+	}
+	if (depth != 0)
+		return 0;
+
+	return 1;
+}
+
 static void compile_regex_for_op(amtail_byteop *op, amtail_log_level amtail_ll)
 {
 	if (!op || !op->export_name || !op->export_name->s || !op->export_name->l)
@@ -90,14 +137,6 @@ static void compile_regex_for_op(amtail_byteop *op, amtail_log_level amtail_ll)
 		pattern_len = op->export_name->l;
 	}
 
-	/*
-	 * Parser uses BRANCH for pure /.../ blocks and for condition forms
-	 * like "$message /.../". The latter are not standalone regex patterns.
-	 */
-	if (op->opcode == AMTAIL_AST_OPCODE_BRANCH &&
-	    (pattern[0] == '$' || strstr(pattern, " /") || strstr(pattern, " $")))
-		return;
-
 	/* Keep parser output intact; trim only canonical /.../ wrapper if present. */
 	if (op->opcode == AMTAIL_AST_OPCODE_BRANCH &&
 	    pattern_len >= 2 && pattern[0] == '/' && pattern[pattern_len - 1] == '/')
@@ -105,6 +144,9 @@ static void compile_regex_for_op(amtail_byteop *op, amtail_log_level amtail_ll)
 		++pattern;
 		pattern_len -= 2;
 	}
+
+	if (!amtail_regex_pattern_compilable(pattern, pattern_len))
+		return;
 
 	char *compiled_pattern = strndup(pattern, pattern_len);
 	if (!compiled_pattern)
