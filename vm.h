@@ -3,6 +3,9 @@
 #include "variables.h"
 #define AMTAIL_VM_STACK_SIZE 1024
 #define AMTAIL_CAPTURE_MAX 64
+#define AMTAIL_SPLIT_MAX 64
+#define AMTAIL_SPLIT_BIND_MAX 64
+#define AMTAIL_SPLIT_ARRAYS_MAX 16
 
 typedef struct amtail_capture_slice {
 	const char *ptr;
@@ -14,6 +17,14 @@ typedef struct amtail_named_capture_slot {
 	uint8_t name_len;
 	amtail_capture_slice slice;
 } amtail_named_capture_slot;
+
+typedef struct amtail_named_split_array {
+	char name[AMTAIL_SPLIT_BIND_MAX];
+	uint8_t name_len;
+	char *storage;
+	amtail_capture_slice parts[AMTAIL_SPLIT_MAX];
+	uint8_t count;
+} amtail_named_split_array;
 
 typedef struct amtail_touch_callbacks {
 	void *userdata;
@@ -41,6 +52,19 @@ typedef struct amtail_thread {
     amtail_capture_slice captures[AMTAIL_CAPTURE_MAX];
     uint8_t named_capture_count;
     amtail_named_capture_slot named_captures[AMTAIL_CAPTURE_MAX];
+    /* Line-scoped split() / loop state (reset each log line). */
+    char *split_storage;
+    amtail_capture_slice split_parts[AMTAIL_SPLIT_MAX];
+    uint8_t split_count;
+    uint8_t split_index;
+    char split_bind[AMTAIL_SPLIT_BIND_MAX];
+    uint8_t split_bind_len;
+    uint8_t split_active;
+    /* Named split results: $responses = split(",", $field) */
+    amtail_named_split_array split_arrays[AMTAIL_SPLIT_ARRAYS_MAX];
+    uint8_t split_array_count;
+    /* During range() / split-as loops: iteration source array (not owned). */
+    amtail_named_split_array *split_loop_array;
 } amtail_thread;
 
 amtail_thread *amtail_thread_init(void);

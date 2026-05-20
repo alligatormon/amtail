@@ -1,0 +1,5 @@
+counter pglog_slow_query_info by query
+
+/statement: (?<query>.+)/ {
+  pglog_slow_query_info[$query]++
+}

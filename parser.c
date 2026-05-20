@@ -371,6 +371,8 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 				cur->opcode = AMTAIL_AST_OPCODE_FUNC_STRPTIME;
 			else if (!strcmp(expr, "subst"))
 				cur->opcode = AMTAIL_AST_OPCODE_FUNC_SUBST;
+			else if (!strcmp(expr, "split"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_SPLIT;
 			else
 			{
 				cur->opcode = AMTAIL_AST_OPCODE_VAR;
@@ -545,8 +547,64 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			continue;
 		}
 
+		if (!strcmp(t, "range"))
+		{
+			uint64_t j = i + 1;
+			if (j < tokens->l && !strcmp(tokens->str[j]->s, "("))
+			{
+				j++;
+				if (j < tokens->l)
+				{
+					string *array_tok = string_string_init_dup(tokens->str[j]);
+					j++;
+					if (array_tok && j < tokens->l && !strcmp(tokens->str[j]->s, ")"))
+					{
+						j++;
+						if (j < tokens->l && !strcmp(tokens->str[j]->s, "as"))
+						{
+							j++;
+							if (j < tokens->l && tokens->str[j]->s[0] == '$')
+							{
+								string *bind_tok = tokens->str[j];
+								j++;
+								if (j < tokens->l && !strcmp(tokens->str[j]->s, "{"))
+								{
+									cur->opcode = AMTAIL_AST_OPCODE_RANGE_FOREACH;
+									cur->svalue = array_tok;
+									cur->name = string_init_alloc(bind_tok->s + 1, bind_tok->l - 1);
+									i = j - 1;
+									last_token = tok;
+									continue;
+								}
+								string_free(array_tok);
+							}
+						}
+					}
+					if (array_tok)
+						string_free(array_tok);
+				}
+			}
+		}
+
 		if (!strcmp(t, "{"))
 		{
+			if (cur->opcode == AMTAIL_AST_OPCODE_RANGE_FOREACH)
+			{
+				++identy;
+				amtail_ast_stack_push(stack, cur);
+				if (!cur->stem)
+					cur->stem = amtail_ast_multi_init(2);
+				if (!cur->stem[AMTAIL_AST_LEFT])
+				{
+					amtail_ast *body = amtail_ast_init();
+					if (body)
+						cur->stem[AMTAIL_AST_LEFT] = body;
+				}
+				if (cur->stem[AMTAIL_AST_LEFT])
+					cur = cur->stem[AMTAIL_AST_LEFT];
+				continue;
+			}
+
 			++identy;
 			cur->opcode = AMTAIL_AST_OPCODE_BRANCH;
 			pstate.branch = 0;
@@ -751,6 +809,32 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 
 		if (pstate.expression && calculation_expr)
 		{
+			/* Merge `var[index]` into one expression token: $responses[$i]. */
+			if (!strcmp(t, "[") && calculation_expr->qcur > 0 &&
+			    calculation_expr->queue[calculation_expr->qcur - 1].vartype == ALLIGATOR_VARTYPE_TEXT)
+			{
+				string *merged = string_string_init_dup(
+					calculation_expr->queue[calculation_expr->qcur - 1].svalue);
+				uint64_t j = i;
+				while (merged && j < tokens->l)
+				{
+					string_string_cat(merged, tokens->str[j]);
+					if (!strcmp(tokens->str[j]->s, "]"))
+						break;
+					++j;
+				}
+				if (merged && j < tokens->l && !strcmp(tokens->str[j]->s, "]"))
+				{
+					string_free(calculation_expr->queue[calculation_expr->qcur - 1].svalue);
+					calculation_expr->queue[calculation_expr->qcur - 1].svalue = merged;
+					i = j;
+					last_token = tok;
+					continue;
+				}
+				if (merged)
+					string_free(merged);
+			}
+
 			/* Single-arg function calls like `len(x)`, `tolower(x)`,
 			 * `settime(x)`, `int(x)`, `float(x)`, `string(x)`, `bool(x)`.
 			 * Parser emits: [arg, funcname] on the shunting-yard queue so
@@ -776,7 +860,7 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 
 			/* Two-arg function calls like `strtol(val, base)` and
 			 * `strptime(value, format)`. */
-			int is_two_arg_fn = (!strcmp(t, "strtol") || !strcmp(t, "strptime"));
+			int is_two_arg_fn = (!strcmp(t, "strtol") || !strcmp(t, "strptime") || !strcmp(t, "split"));
 			if (is_two_arg_fn)
 			{
 				if (i + 4 < tokens->l &&
@@ -1060,8 +1144,14 @@ char *opname_from_code(uint64_t opcode) {
 		"AMTAIL_AST_OPCODE_REGEX",
 		"AMTAIL_AST_OPCODE_VAR",
 		"AMTAIL_AST_OPCODE_RUN",
+		"AMTAIL_AST_OPCODE_FUNC_SPLIT",
+		"AMTAIL_AST_OPCODE_RANGE_FOREACH",
+		"AMTAIL_AST_OPCODE_RANGE",
+		"AMTAIL_AST_OPCODE_RANGE_STEP",
 	};
 
-	return namecodes[opcode];
+	if (opcode < sizeof(namecodes) / sizeof(namecodes[0]))
+		return namecodes[opcode];
+	return "AMTAIL_AST_OPCODE_UNKNOWN";
 }
 

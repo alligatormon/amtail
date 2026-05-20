@@ -59,6 +59,10 @@
 #define AMTAIL_AST_OPCODE_REGEX 42
 #define AMTAIL_AST_OPCODE_VAR 43 // use variable
 #define AMTAIL_AST_OPCODE_RUN 44 // expression is ended, should be calculate and assign
+#define AMTAIL_AST_OPCODE_FUNC_SPLIT 45 // split(sep, str) -> count; stores named array on assign
+#define AMTAIL_AST_OPCODE_RANGE_FOREACH 46 // range($array) as $x { ... } (AST only)
+#define AMTAIL_AST_OPCODE_RANGE 47 // runtime: enter range loop over named split array
+#define AMTAIL_AST_OPCODE_RANGE_STEP 48 // runtime: next range iteration
 
 typedef struct amtail_ast {
 	enum { gauge, counter } tag;

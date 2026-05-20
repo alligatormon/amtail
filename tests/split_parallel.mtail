@@ -1,0 +1,14 @@
+gauge upstream_rt by server
+counter upstream_st by server
+
+/(?P<rt>[^ ]+) (?P<st>[^ ]+) (?P<sv>[^ ]+)/ {
+  $responses = split(",", $rt)
+  $statuses = split(",", $st)
+  $servers = split(",", $sv)
+  i = int(0)
+  range($servers) as $server {
+    upstream_rt[$server] = $responses[$i]
+    upstream_st[$server] = $statuses[$i]
+    i++
+  }
+}

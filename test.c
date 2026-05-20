@@ -927,6 +927,53 @@ static int vm_runtime_test_keyed_counter_inc(void)
 	return ok;
 }
 
+static int vm_runtime_test_split_parallel(void)
+{
+	amtail_log_level amtail_ll = {0};
+	const char *script_path = "tests/split_parallel.mtail";
+	const char *log_line = "1.0,2.0 200,404 a,b\n";
+
+	string *src = string_init_dup((char*)script_path);
+	string_tokens *tokens = amtail_lex(src, (char*)script_path, amtail_ll);
+	if (!tokens)
+	{
+		string_free(src);
+		return 0;
+	}
+	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
+	if (!ast)
+	{
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
+	if (!byte_code)
+	{
+		amtail_ast_free(ast);
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+
+	alligator_ht *variables = amtail_variables_init();
+	string *line = string_init_dup((char*)log_line);
+	int rc = amtail_run(byte_code, variables, line, amtail_ll, NULL, NULL);
+	int ok = rc &&
+	         runtime_expect_gauge_key(variables, "upstream_rt[a]", 1.0) &&
+	         runtime_expect_gauge_key(variables, "upstream_rt[b]", 2.0) &&
+	         runtime_expect_counter_key(variables, "upstream_st[a]", 200) &&
+	         runtime_expect_counter_key(variables, "upstream_st[b]", 404);
+
+	string_free(line);
+	amtail_variables_free(variables);
+	amtail_code_free(byte_code);
+	amtail_ast_free(ast);
+	string_tokens_free(tokens);
+	string_free(src);
+	return ok;
+}
+
 static int vm_runtime_test_beanstalkd_named_gauge(void)
 {
 	amtail_log_level amtail_ll = {0};
@@ -983,13 +1030,14 @@ static int vm_runtime_tests(void)
 	int rc_source = vm_runtime_test_mtail_source_functions();
 	int rc_keyed = vm_runtime_test_keyed_counter_inc();
 	int rc_beanstalkd = vm_runtime_test_beanstalkd_named_gauge();
+	int rc_split = vm_runtime_test_split_parallel();
 	int ok = rc_timestamp && rc_len_strtol && rc_strptime_match &&
 	         rc_tolower && rc_getfilename && rc_subst && rc_settime_strptime &&
-	         rc_source && rc_keyed && rc_beanstalkd;
+	         rc_source && rc_keyed && rc_beanstalkd && rc_split;
 	printf("[VM] timestamp=%d len_strtol=%d strptime_match=%d tolower=%d "
-	       "getfilename=%d subst=%d settime_strptime=%d source=%d keyed=%d beanstalkd=%d\n",
+	       "getfilename=%d subst=%d settime_strptime=%d source=%d keyed=%d beanstalkd=%d split=%d\n",
 	       rc_timestamp, rc_len_strtol, rc_strptime_match, rc_tolower,
-	       rc_getfilename, rc_subst, rc_settime_strptime, rc_source, rc_keyed, rc_beanstalkd);
+	       rc_getfilename, rc_subst, rc_settime_strptime, rc_source, rc_keyed, rc_beanstalkd, rc_split);
 	if (!ok)
 		printf("[FAIL][VM] runtime feature tests\n");
 	else

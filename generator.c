@@ -12,7 +12,7 @@ static int amtail_ast_node_valid(amtail_ast *ast, amtail_log_level amtail_ll)
 	if (!ast)
 		return 0;
 
-	if (ast->opcode > AMTAIL_AST_OPCODE_RUN)
+	if (ast->opcode > AMTAIL_AST_OPCODE_RANGE_STEP)
 	{
 		if (amtail_ll.generator > 0)
 			printf("skip invalid opcode: %u\n", ast->opcode);
@@ -229,10 +229,21 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
 	}
 
 	amtail_byteop *fill = &byte_code->ops[byte_code->l];
-	fill->opcode = ast->opcode;
+	if (ast->opcode == AMTAIL_AST_OPCODE_RANGE_FOREACH)
+		fill->opcode = AMTAIL_AST_OPCODE_RANGE;
+	else
+		fill->opcode = ast->opcode;
 	fill->vartype = ast->vartype;
 	fill->facttype = ast->facttype;
 	fill->hidden = ast->hidden;
+
+	if (fill->opcode == AMTAIL_AST_OPCODE_RANGE)
+	{
+		if (ast->name && ast->name->s)
+			fill->ls = string_string_init_dup(ast->name);
+		if (ast->svalue && ast->svalue->s)
+			fill->rs = string_string_init_dup(ast->svalue);
+	}
 	if (fill->opcode == AMTAIL_AST_OPCODE_VARIABLE)
 	{
 		copy_labels(ast->by, ast->by_count, &fill->by, &fill->by_count);
@@ -299,6 +310,8 @@ typedef struct walk_frame {
 	uint64_t index;
 	uint32_t depth;
 	uint8_t stage; /* 0: enter, 1: after-left, 2: done */
+	uint64_t foreach_pc;
+	uint64_t foreach_body_pc;
 } walk_frame;
 
 static void walk_stack_push(walk_frame **stack, uint64_t *len, uint64_t *cap, walk_frame frame)
@@ -345,6 +358,32 @@ static void amtail_bytecode_walk_iterative(amtail_bytecode *byte_code, amtail_as
 				continue;
 			}
 
+			if (node->opcode == AMTAIL_AST_OPCODE_RANGE_FOREACH)
+			{
+				if (ctx && ast_walk_seen(ctx, node))
+				{
+					--stack_len;
+					continue;
+				}
+				if (ctx && !ast_walk_mark(ctx, node))
+				{
+					--stack_len;
+					continue;
+				}
+
+				f->foreach_pc = byte_code->l;
+				amtail_code_push(byte_code, node, amtail_ll);
+				f->foreach_body_pc = byte_code->l;
+				f->stage = 2;
+				if (node->stem && node->stem[AMTAIL_AST_LEFT] && node->stem[AMTAIL_AST_LEFT] != node)
+				{
+					walk_stack_push(&stack, &stack_len, &stack_cap,
+					                (walk_frame){ .node = node->stem[AMTAIL_AST_LEFT], .index = 0, .depth = f->depth + 1,
+					                              .stage = 0, .foreach_pc = f->foreach_pc, .foreach_body_pc = f->foreach_body_pc });
+				}
+				continue;
+			}
+
 			if (ctx && ast_walk_seen(ctx, node))
 			{
 				if (amtail_ll.generator > 1)
@@ -385,6 +424,20 @@ static void amtail_bytecode_walk_iterative(amtail_bytecode *byte_code, amtail_as
 				                (walk_frame){ .node = node->stem[AMTAIL_AST_RIGHT], .index = 0, .depth = f->depth + 1, .stage = 0 });
 			}
 			continue;
+		}
+
+		if (f->stage == 2 && node->opcode == AMTAIL_AST_OPCODE_RANGE_FOREACH)
+		{
+			uint64_t step_pc = byte_code->l;
+			amtail_ast step_ast = {0};
+			step_ast.opcode = AMTAIL_AST_OPCODE_RANGE_STEP;
+			amtail_code_push(byte_code, &step_ast, amtail_ll);
+			if (f->foreach_pc < byte_code->l)
+			{
+				byte_code->ops[f->foreach_pc].right_opcounter = f->foreach_body_pc;
+				byte_code->ops[step_pc].li = f->foreach_body_pc;
+				byte_code->ops[step_pc].ri = f->foreach_pc;
+			}
 		}
 
 		--stack_len;
@@ -440,6 +493,14 @@ void amtail_code_free(amtail_bytecode *byte_code)
 		    ops->facttype == ALLIGATOR_FACTTYPE_TEXT &&
 		    ops->ls)
 			string_free(ops->ls);
+
+		if (ops->opcode == AMTAIL_AST_OPCODE_RANGE)
+		{
+			if (ops->ls)
+				string_free(ops->ls);
+			if (ops->rs)
+				string_free(ops->rs);
+		}
 
 		if (ops->re_match)
 			amtail_regex_free(ops->re_match);
