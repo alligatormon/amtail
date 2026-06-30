@@ -20,7 +20,12 @@ file *readfile(char *path)
 	fstat(a->fd, &a->st);
 	a->size=a->st.st_size;
 	a->mem = calloc(1, a->size + 1);
-	read(a->fd, a->mem, a->size);
+	if (read(a->fd, a->mem, a->size) < 0) {
+		free(a->mem);
+		close(a->fd);
+		free(a);
+		return 0;
+	}
 	a->mem[a->size] = 0;
 
 	return a;
