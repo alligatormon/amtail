@@ -1,0 +1,7 @@
+counter matched_lines
+
+getfilename() =~ /upstream.log/ {
+	/^"(?P<utime>[\d.]+)" / {
+		matched_lines++
+	}
+}

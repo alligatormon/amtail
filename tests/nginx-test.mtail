@@ -1,0 +1,16 @@
+counter nginx_request_count by protocol, status, auth
+counter nginx_request_by_backend_count by backend, status
+histogram nginx_upstream_response_time buckets 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5
+
+getfilename() =~ /access.log/ {
+	/^\[\d\d\/[A-Za-z]{3}\/20\d\d:\d\d:\d\d:\d\d \+\d{4}\] [^ ]+ from [^ ]+ by (?P<proto>[^ ]+) status: "(?P<status>[^"]+)" backend: (?P<backend>[^ ]+) attempt: 1 auth: (?P<auth>[^ ]+)$/ {
+		nginx_request_count[$proto][$status][$auth]++
+		nginx_request_by_backend_count[$backend][$status]++
+	}
+}
+
+getfilename() =~ /upstream.log/ {
+	/^"(?P<utime>[\d.]+)" / {
+		nginx_upstream_response_time = $utime
+	}
+}

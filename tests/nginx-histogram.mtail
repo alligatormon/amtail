@@ -1,0 +1,7 @@
+histogram nginx_upstream_response_time buckets 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5
+
+getfilename() =~ /upstream.log/ {
+	/^"(?P<utime>[\d.]+)" / {
+		nginx_upstream_response_time = $utime
+	}
+}
