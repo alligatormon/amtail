@@ -72,5 +72,5 @@ void amtail_thread_free(amtail_thread *amt_thread);
 
 void amtail_bytecode_dump(amtail_bytecode* byte_code);
 int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, amtail_log_level amtail_ll, const amtail_touch_callbacks *touch, struct amtail_thread *reuse_thread);
-int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, const char *filename, amtail_log_level amtail_ll, const amtail_touch_callbacks *touch, struct amtail_thread *reuse_thread);
+int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, const char *filename, amtail_log_level amtail_ll, const amtail_touch_callbacks *touch, struct amtail_thread *reuse_thread, uint8_t *variables_prepared);
 void amtail_vm_init();

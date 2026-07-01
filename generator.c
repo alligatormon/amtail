@@ -118,6 +118,18 @@ static void compile_regex_for_op(amtail_byteop *op, amtail_log_level amtail_ll)
 	    op->opcode != AMTAIL_AST_OPCODE_NOTMATCH)
 		return;
 
+	/* `getfilename() =~ /pattern/` is a filename guard, not a log-line regex. */
+	if (op->opcode == AMTAIL_AST_OPCODE_BRANCH && op->export_name && op->export_name->s)
+	{
+		const char *s = op->export_name->s;
+		if (strstr(s, "getfilename()"))
+			return;
+		while (*s == ' ' || *s == '\t')
+			++s;
+		if (*s == ')' && strchr(s, '/'))
+			return;
+	}
+
 	char *pattern = NULL;
 	size_t pattern_len = 0;
 

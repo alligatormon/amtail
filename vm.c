@@ -31,6 +31,7 @@ static void amtail_vm_captures_reset(amtail_thread *t);
 static int amtail_vm_resolve_capture_token(const char *key, size_t token_len, amtail_thread *t,
 	alligator_ht *variables, const char **emit, size_t *emit_len);
 static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *variables, amtail_thread *t);
+static char *amtail_vm_token_to_string(const char *token, alligator_ht *variables, amtail_thread *t);
 static uint8_t amtail_vm_do_split(amtail_thread *t, const char *sep, size_t sep_len, const char *str, size_t str_len);
 static void amtail_vm_split_publish_captures(amtail_thread *t);
 static void amtail_vm_split_bind_current(amtail_thread *t);
@@ -604,6 +605,59 @@ static int amtail_vm_compare_equal(amtail_byteop *left, amtail_byteop *right, al
 	free(ls);
 	free(rs);
 	return eq;
+}
+
+static int amtail_vm_rhs_is_slash_regex(const char *rhs)
+{
+	if (!rhs || rhs[0] != '/')
+		return 0;
+	const char *last = strrchr(rhs + 1, '/');
+	return last && last != rhs;
+}
+
+static char *amtail_vm_eval_condition_lhs(const char *token, alligator_ht *variables, amtail_thread *t)
+{
+	if (!token)
+		return NULL;
+	if (!strcmp(token, "getfilename()") || !strcmp(token, ")"))
+		return strdup((t && t->filename) ? t->filename : "");
+	return amtail_vm_token_to_string(token, variables, t);
+}
+
+static int amtail_vm_string_slash_regex_match(const char *haystack, const char *slash_pattern, amtail_log_level amtail_ll)
+{
+	if (!haystack || !amtail_vm_rhs_is_slash_regex(slash_pattern))
+		return 0;
+
+	const char *inner = slash_pattern + 1;
+	size_t inner_len = (size_t)(strrchr(slash_pattern + 1, '/') - inner);
+	if (!inner_len)
+		return 0;
+
+	char *pat = strndup(inner, inner_len);
+	if (!pat)
+		return 0;
+
+	regex_match *rm = amtail_regex_compile(pat);
+	free(pat);
+	if (!rm)
+		return 0;
+
+	int rc = amtail_regex_exec(rm, (char *)haystack, strlen(haystack), amtail_ll) ? 1 : 0;
+	amtail_regex_free(rm);
+	return rc;
+}
+
+static int amtail_vm_branch_is_filename_guard(const char *expr)
+{
+	if (!expr)
+		return 0;
+	if (strstr(expr, "getfilename()"))
+		return 1;
+	/* Parser used to emit `) /pattern/` for `getfilename() =~ /pattern/`. */
+	while (*expr == ' ' || *expr == '\t')
+		++expr;
+	return expr[0] == ')' && strchr(expr, '/');
 }
 
 static int amtail_vm_extract_binary_operands(const char *expr, char **lhs, char **rhs)
@@ -1237,7 +1291,7 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		resolved->ld = byte_ops->ld;
 }
 
-static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables)
+static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, amtail_log_level amtail_ll)
 {
 	if (!byte_ops)
 		return 0;
@@ -1274,11 +1328,16 @@ static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byt
 			matched = (ln == rn);
 		else
 		{
-			char *ls = amtail_vm_token_to_string(lhs, variables, amt_thread);
-			char *rs = amtail_vm_token_to_string(rhs, variables, amt_thread);
-			matched = (ls && rs && strcmp(ls, rs) == 0);
+			char *ls = amtail_vm_eval_condition_lhs(lhs, variables, amt_thread);
+			if (amtail_vm_rhs_is_slash_regex(rhs))
+				matched = amtail_vm_string_slash_regex_match(ls, rhs, amtail_ll);
+			else
+			{
+				char *rs = amtail_vm_token_to_string(rhs, variables, amt_thread);
+				matched = (ls && rs && strcmp(ls, rs) == 0);
+				free(rs);
+			}
 			free(ls);
-			free(rs);
 		}
 		free(lhs);
 		free(rhs);
@@ -1292,9 +1351,16 @@ uint64_t amtail_vmfunc_branch(amtail_thread *amt_thread, amtail_byteop *byte_ops
 	if (!byte_ops)
 		return 0;
 
+	if (byte_ops->export_name && byte_ops->export_name->s &&
+	    amtail_vm_branch_is_filename_guard(byte_ops->export_name->s))
+	{
+		int cond = amtail_vm_branch_condition_true(amt_thread, byte_ops, variables, amtail_ll);
+		return cond ? 0 : byte_ops->right_opcounter;
+	}
+
 	if (!byte_ops->re_match)
 	{
-		int cond = amtail_vm_branch_condition_true(amt_thread, byte_ops, variables);
+		int cond = amtail_vm_branch_condition_true(amt_thread, byte_ops, variables, amtail_ll);
 		return cond ? 0 : byte_ops->right_opcounter;
 	}
 
@@ -2800,7 +2866,7 @@ uint64_t amtail_branch_select(amtail_thread *amt_thread, amtail_bytecode *byte_c
 	 * block body hangs off BRANCH.LEFT and subsequent siblings are on
 	 * BRANCH.RIGHT (see parser.c `}` handler).
 	 */
-	int cond = amtail_vm_branch_condition_true(amt_thread, byte_ops, variables);
+	int cond = amtail_vm_branch_condition_true(amt_thread, byte_ops, variables, amtail_ll);
 	return cond ? 0 : byte_ops->right_opcounter;
 }
 
@@ -2922,13 +2988,14 @@ void amtail_bytecode_dump(amtail_bytecode* byte_code)
 	}
 }
 
-int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, const char *filename, amtail_log_level amtail_ll, const amtail_touch_callbacks *touch, struct amtail_thread *reuse_thread)
+int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, const char *filename, amtail_log_level amtail_ll, const amtail_touch_callbacks *touch, struct amtail_thread *reuse_thread, uint8_t *variables_prepared)
 {
 	uint64_t size = byte_code->l;
 	amtail_byteop *byte_ops = byte_code->ops;
 	int rc;
 	uint64_t line_size = 0;
 	int owns_thread = 0;
+	uint8_t *prep_flag = variables_prepared ? variables_prepared : &byte_code->prepared;
 
 	amtail_thread *amt_thread = reuse_thread;
 	if (!amt_thread)
@@ -2942,13 +3009,13 @@ int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string*
 	else
 		memset(&amt_thread->touch, 0, sizeof(amt_thread->touch));
 
-	if (!byte_code->prepared)
+	if (!*prep_flag)
 	{
 		for (uint64_t i = 0; i < size; ++i)
 		{
 			amtail_pre_execute(amt_thread, &byte_ops[i], variables, logline, amtail_ll);
 		}
-		byte_code->prepared = 1;
+		*prep_flag = 1;
 	}
 
 	for (uint64_t cursym_log = 0; cursym_log < logline->l; )
@@ -3007,5 +3074,5 @@ int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string*
 
 int amtail_run(amtail_bytecode* byte_code, alligator_ht *variables, string* logline, amtail_log_level amtail_ll, const amtail_touch_callbacks *touch, struct amtail_thread *reuse_thread)
 {
-	return amtail_run_file(byte_code, variables, logline, NULL, amtail_ll, touch, reuse_thread);
+	return amtail_run_file(byte_code, variables, logline, NULL, amtail_ll, touch, reuse_thread, NULL);
 }

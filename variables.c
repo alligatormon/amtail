@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 void amtail_variables_dump_foreach(void *funcarg, void* arg)
 {
@@ -58,7 +59,11 @@ void amtail_variables_dump_foreach(void *funcarg, void* arg)
 				string_int(dst, var->i);
 		}
 		else if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM)
-			string_double(dst, var->d);
+		{
+			string_uint(dst, var->histogram_count);
+			fprintf(stderr, "histogram %s count=%" PRIu64 " sum=%g\n",
+				var->export_name->s, var->histogram_count, var->histogram_sum);
+		}
 		else if (var->type == ALLIGATOR_VARTYPE_TEXT)
 			string_string_cat(dst, var->s);
 	}

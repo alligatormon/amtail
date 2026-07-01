@@ -979,7 +979,15 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			if (!cur->name)
 				cur->name = string_new();
 
-			if (last_token)
+			if (i >= 3 &&
+			    !strcmp(tokens->str[i - 1]->s, ")") &&
+			    !strcmp(tokens->str[i - 2]->s, "("))
+			{
+				string *fname = tokens->str[i - 3];
+				string_cat(cur->name, fname->s, fname->l);
+				string_cat(cur->name, "()", 2);
+			}
+			else if (last_token)
 				string_string_cat(cur->name, last_token);
 
 			if (i + 1 < tokens->l && strcmp(tokens->str[i + 1]->s, "\n") && strcmp(tokens->str[i + 1]->s, "{"))

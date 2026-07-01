@@ -142,7 +142,7 @@ static int run_mtail_script_with_log(const char *script_path, const char *log_pa
 	while ((linelen = getline(&linebuf, &linecap, logf)) != -1)
 	{
 		string *line = string_init_alloc(linebuf, (uint64_t)linelen);
-		int line_rc = amtail_run(byte_code, variables, line, amtail_ll, NULL, NULL);
+		int line_rc = amtail_run_file(byte_code, variables, line, log_path, amtail_ll, NULL, NULL, NULL);
 		string_free(line);
 		if (!line_rc)
 		{
@@ -427,6 +427,14 @@ static int runtime_expect_counter(alligator_ht *variables, const char *name, int
 	return var && var->type == ALLIGATOR_VARTYPE_COUNTER && var->i == expect;
 }
 
+static int runtime_expect_histogram_count(alligator_ht *variables, const char *name, uint64_t expect)
+{
+	size_t nl = strlen(name);
+	amtail_lookup_key lk = { name, nl };
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, &lk, amtail_hash((char*)name, nl));
+	return var && var->type == ALLIGATOR_VARTYPE_HISTOGRAM && var->histogram_count == expect;
+}
+
 static int runtime_expect_counter_key(alligator_ht *variables, const char *key, int64_t expect)
 {
 	size_t kl = strlen(key);
@@ -564,11 +572,117 @@ static int vm_runtime_test_getfilename(void)
 	bc->ops[3].opcode = AMTAIL_AST_OPCODE_RUN;
 	alligator_ht *variables = amtail_variables_init();
 	string *line = string_init_dup("x\n");
-	int ok = amtail_run_file(bc, variables, line, "/var/log/syslog", amtail_ll, NULL, NULL) &&
+	int ok = amtail_run_file(bc, variables, line, "/var/log/syslog", amtail_ll, NULL, NULL, NULL) &&
 	         runtime_expect_text(variables, "fname", "/var/log/syslog");
 	string_free(line);
 	amtail_variables_free(variables);
 	runtime_bc_free(bc);
+	return ok;
+}
+
+static int vm_runtime_test_getfilename_branch(void)
+{
+	amtail_log_level amtail_ll = {0};
+	const char *script_path = "tests/getfilename_branch.mtail";
+	const char *log_line =
+		"\"0.001\" 1782857537.661 10.12.13.96 dccecece@example.ru Invalid login or password\n";
+
+	string *src = string_init_dup((char*)script_path);
+	string_tokens *tokens = amtail_lex(src, (char*)script_path, amtail_ll);
+	if (!tokens)
+	{
+		string_free(src);
+		return 0;
+	}
+	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
+	if (!ast)
+	{
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
+	if (!byte_code)
+	{
+		amtail_ast_free(ast);
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+
+	alligator_ht *variables = amtail_variables_init();
+	string *line = string_init_dup((char*)log_line);
+	uint8_t prepared_a = 0;
+	int ok = amtail_run_file(byte_code, variables, line, "/var/log/nginx/upstream.log", amtail_ll, NULL, NULL, &prepared_a) &&
+	         runtime_expect_counter(variables, "matched_lines", 1);
+
+	string_free(line);
+	amtail_variables_free(variables);
+
+	uint8_t prepared_b = 0;
+	line = string_init_dup((char*)log_line);
+	variables = amtail_variables_init();
+	ok = ok && amtail_run_file(byte_code, variables, line, "/var/log/nginx/access.log", amtail_ll, NULL, NULL, &prepared_b) &&
+	     runtime_expect_counter(variables, "matched_lines", 0);
+
+	string_free(line);
+	amtail_variables_free(variables);
+	amtail_code_free(byte_code);
+	amtail_ast_free(ast);
+	string_tokens_free(tokens);
+	string_free(src);
+	return ok;
+}
+
+static int vm_runtime_test_shared_bytecode_dual_variables(void)
+{
+	amtail_log_level amtail_ll = {0};
+	const char *script_path = "tests/nginx-mail-histogram.mtail";
+	const char *log_line =
+		"\"0.008\" 1782884991.526 10.12.13.96 dccecece@example.ru Invalid login or password\n";
+
+	string *src = string_init_dup((char*)script_path);
+	string_tokens *tokens = amtail_lex(src, (char*)script_path, amtail_ll);
+	if (!tokens)
+	{
+		string_free(src);
+		return 0;
+	}
+	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
+	if (!ast)
+	{
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
+	if (!byte_code)
+	{
+		amtail_ast_free(ast);
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+
+	string *line = string_init_dup((char*)log_line);
+	uint8_t prepared_access = 0;
+	uint8_t prepared_upstream = 0;
+	alligator_ht *access_vars = amtail_variables_init();
+	alligator_ht *upstream_vars = amtail_variables_init();
+	int ok = 1;
+
+	/* Simulate access aggregate touching shared bytecode first. */
+	ok = ok && amtail_run_file(byte_code, access_vars, line, "/var/log/nginx/access.log", amtail_ll, NULL, NULL, &prepared_access);
+	ok = ok && amtail_run_file(byte_code, upstream_vars, line, "/var/log/nginx/upstream.log", amtail_ll, NULL, NULL, &prepared_upstream) &&
+	     runtime_expect_histogram_count(upstream_vars, "nginx_mail_upstream_response_time", 1);
+
+	string_free(line);
+	amtail_variables_free(access_vars);
+	amtail_variables_free(upstream_vars);
+	amtail_code_free(byte_code);
+	amtail_ast_free(ast);
+	string_tokens_free(tokens);
+	string_free(src);
 	return ok;
 }
 
@@ -749,7 +863,7 @@ static int vm_runtime_test_mtail_source_functions(void)
 	runtime_insert_text(variables, "sample", "a foo and a foo");
 	runtime_insert_text(variables, "digits", "42");
 	string *line = string_init_dup("dummy line\n");
-	int rc = amtail_run_file(byte_code, variables, line, "/tmp/fake.log", amtail_ll, NULL, NULL);
+	int rc = amtail_run_file(byte_code, variables, line, "/tmp/fake.log", amtail_ll, NULL, NULL, NULL);
 
 	int ok = rc &&
 	         runtime_expect_counter(variables, "word_len", 5) &&
@@ -1025,6 +1139,8 @@ static int vm_runtime_tests(void)
 	int rc_strptime_match = vm_runtime_test_strptime_and_match();
 	int rc_tolower = vm_runtime_test_tolower();
 	int rc_getfilename = vm_runtime_test_getfilename();
+	int rc_getfilename_branch = vm_runtime_test_getfilename_branch();
+	int rc_dual_variables = vm_runtime_test_shared_bytecode_dual_variables();
 	int rc_subst = vm_runtime_test_subst();
 	int rc_settime_strptime = vm_runtime_test_settime_strptime();
 	int rc_source = vm_runtime_test_mtail_source_functions();
@@ -1032,12 +1148,12 @@ static int vm_runtime_tests(void)
 	int rc_beanstalkd = vm_runtime_test_beanstalkd_named_gauge();
 	int rc_split = vm_runtime_test_split_parallel();
 	int ok = rc_timestamp && rc_len_strtol && rc_strptime_match &&
-	         rc_tolower && rc_getfilename && rc_subst && rc_settime_strptime &&
+	         rc_tolower && rc_getfilename && rc_getfilename_branch && rc_dual_variables && rc_subst && rc_settime_strptime &&
 	         rc_source && rc_keyed && rc_beanstalkd && rc_split;
 	printf("[VM] timestamp=%d len_strtol=%d strptime_match=%d tolower=%d "
-	       "getfilename=%d subst=%d settime_strptime=%d source=%d keyed=%d beanstalkd=%d split=%d\n",
+	       "getfilename=%d getfilename_branch=%d dual_variables=%d subst=%d settime_strptime=%d source=%d keyed=%d beanstalkd=%d split=%d\n",
 	       rc_timestamp, rc_len_strtol, rc_strptime_match, rc_tolower,
-	       rc_getfilename, rc_subst, rc_settime_strptime, rc_source, rc_keyed, rc_beanstalkd, rc_split);
+	       rc_getfilename, rc_getfilename_branch, rc_dual_variables, rc_subst, rc_settime_strptime, rc_source, rc_keyed, rc_beanstalkd, rc_split);
 	if (!ok)
 		printf("[FAIL][VM] runtime feature tests\n");
 	else
@@ -1062,12 +1178,14 @@ int main(int argc, char **argv)
 		"tests/apache_common.mtail",
 		"tests/apache_metrics.mtail",
 		"tests/dhcpd.mtail",
+		"tests/getfilename_branch.mtail",
 		"tests/histogram.mtail",
 		"tests/lighttpd.mtail",
 		"tests/linecount.mtail",
 		"tests/mysql_slowqueries.mtail",
 		"tests/nginx.mtail",
 		"tests/nocode.mtail",
+		"tests/nginx-mail-histogram.mtail",
 		"tests/ntpd.mtail",
 		"tests/ntpd_peerstats.mtail",
 		"tests/postfix.mtail",
