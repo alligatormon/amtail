@@ -4,36 +4,25 @@
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
-#include <inttypes.h>
 
 void amtail_variables_dump_foreach(void *funcarg, void* arg)
 {
 	amtail_variable *var = arg;
-    printf("variable %d: %s\n", var->is_template, var->export_name->s);
 	if (var->is_template)
 		return;
-
-	fprintf(stderr, "dump %s/%s\n", var->export_name->s, var->key ? var->key->s : "");
 
 	string *dst = funcarg;
 	string_string_cat(dst, var->export_name);
 	string_cat(dst, " ", 1);
 
 	if (var->by) {
-		//char *ptrby = var->key;
 		for (uint8_t i = 0; i < var->by_count; ++i)
 		{
 			if (i)
 				string_cat(dst, ", ", 2);
 
-            char *ptrby = var->key->s + var->by_positions[i];
-            uint8_t key_len = var->by_positions[i+1] - var->by_positions[i] - 2;
-            printf("by_position is %hhu/len %hhu (next %hhu)\n", var->by_positions[i], key_len, var->by_positions[i+1]);
-			//ptrby = strstr(ptrby, "[");
-			//if (!ptrby)
-			//	break;
-
-			//uint8_t key_len = strcspn(++ptrby, "]");
+			char *ptrby = var->key->s + var->by_positions[i];
+			uint8_t key_len = var->by_positions[i+1] - var->by_positions[i] - 2;
 
 			string_string_cat(dst, var->by[i]);
 			string_cat(dst, "=", 1);
@@ -50,7 +39,6 @@ void amtail_variables_dump_foreach(void *funcarg, void* arg)
 		else if (var->type == ALLIGATOR_VARTYPE_GAUGE)
 			string_double(dst, var->d);
 		else if (var->type == ALLIGATOR_VARTYPE_CONST) {
-			printf("facttype is %d, name is %s\n", var->facttype, var->export_name->s);
 			if (var->facttype == ALLIGATOR_FACTTYPE_TEXT)
 				string_string_cat(dst, var->s);
 			else if (var->facttype == ALLIGATOR_FACTTYPE_DOUBLE)
@@ -59,24 +47,26 @@ void amtail_variables_dump_foreach(void *funcarg, void* arg)
 				string_int(dst, var->i);
 		}
 		else if (var->type == ALLIGATOR_VARTYPE_HISTOGRAM)
-		{
 			string_uint(dst, var->histogram_count);
-			fprintf(stderr, "histogram %s count=%" PRIu64 " sum=%g\n",
-				var->export_name->s, var->histogram_count, var->histogram_sum);
-		}
 		else if (var->type == ALLIGATOR_VARTYPE_TEXT)
 			string_string_cat(dst, var->s);
 	}
 	string_cat(dst, "\n", 1);
 }
 
-void amtail_variables_dump(alligator_ht *variables)
+string *amtail_variables_format(alligator_ht *variables)
 {
 	string *dst = string_new();
 	alligator_ht_foreach_arg(variables, amtail_variables_dump_foreach, dst);
-    printf("count of variables: %zu\n", alligator_ht_count(variables));
+	return dst;
+}
 
-	fprintf(stderr, "dst is\n%s\n", dst->s);
+void amtail_variables_dump(alligator_ht *variables)
+{
+	string *dst = amtail_variables_format(variables);
+	if (dst && dst->s && dst->s[0])
+		fwrite(dst->s, 1, dst->l, stdout);
+	string_free(dst);
 }
 
 
