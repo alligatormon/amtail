@@ -2156,6 +2156,32 @@ void amtail_vmfunc_fn_getfilename(amtail_thread *amt_thread, amtail_byteop *byte
 	amtail_vm_push_text(amt_thread, name);
 }
 
+/* Alligator extension: emit_log(str) → touch.on_emit_log (log_channel_out). */
+void amtail_vmfunc_fn_emit_log(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, string *logline, amtail_log_level amtail_ll)
+{
+	amtail_byteop *val = amtail_vmstack_pop(amt_thread);
+	if (!val)
+		return;
+	if (val->opcode == AMTAIL_AST_OPCODE_ASSIGN)
+	{
+		amtail_vmstack_push(amt_thread, val);
+		return;
+	}
+
+	char *s = amtail_vm_resolve_string(val, variables, amt_thread);
+	amtail_vm_free_tempop(val);
+	if (s && amt_thread && amt_thread->touch.on_emit_log)
+		amt_thread->touch.on_emit_log(amt_thread->touch.userdata, s, strlen(s));
+	free(s);
+
+	/* Statement placeholder like settime() so RUN/ASSIGN stay balanced. */
+	amtail_byteop *new = amtail_vm_make_temp_value(amt_thread);
+	if (!new)
+		return;
+	new->vartype = ALLIGATOR_VARTYPE_GAUGE;
+	new->ld = 0;
+}
+
 static char* amtail_vm_string_replace_all(const char *haystack, const char *needle, const char *replacement)
 {
 	if (!haystack)
@@ -2803,6 +2829,7 @@ void amtail_vm_init()
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_STRTOL] = amtail_vmfunc_fn_strtol;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_SETTIME] = amtail_vmfunc_fn_settime;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_GETFILENAME] = amtail_vmfunc_fn_getfilename;
+	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_EMIT_LOG] = amtail_vmfunc_fn_emit_log;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_INT] = amtail_vmfunc_cast_int;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_BOOL] = amtail_vmfunc_cast_bool;
 	amtail_vmfunc[AMTAIL_AST_OPCODE_FUNC_FLOAT] = amtail_vmfunc_cast_float;
@@ -2923,6 +2950,7 @@ int amtail_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_STRTOL) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_SETTIME) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_GETFILENAME) ||
+		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_EMIT_LOG) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_INT) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_BOOL) ||
 		(byte_ops->opcode == AMTAIL_AST_OPCODE_FUNC_FLOAT) ||

@@ -367,6 +367,8 @@ void calculation_flush(calculation_cluster **calculation_ptr, amtail_ast *stack,
 				cur->opcode = AMTAIL_AST_OPCODE_FUNC_GETFILENAME;
 			else if (!strcmp(expr, "settime"))
 				cur->opcode = AMTAIL_AST_OPCODE_FUNC_SETTIME;
+			else if (!strcmp(expr, "emit_log"))
+				cur->opcode = AMTAIL_AST_OPCODE_FUNC_EMIT_LOG;
 			else if (!strcmp(expr, "strptime"))
 				cur->opcode = AMTAIL_AST_OPCODE_FUNC_STRPTIME;
 			else if (!strcmp(expr, "subst"))
@@ -842,7 +844,7 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			int is_single_arg_fn = (!strcmp(t, "int") || !strcmp(t, "float") ||
 			                       !strcmp(t, "string") || !strcmp(t, "bool") ||
 			                       !strcmp(t, "len") || !strcmp(t, "tolower") ||
-			                       !strcmp(t, "settime"));
+			                       !strcmp(t, "settime") || !strcmp(t, "emit_log"));
 			if (is_single_arg_fn)
 			{
 				if (i + 3 < tokens->l &&
@@ -1156,6 +1158,7 @@ char *opname_from_code(uint64_t opcode) {
 		"AMTAIL_AST_OPCODE_RANGE_FOREACH",
 		"AMTAIL_AST_OPCODE_RANGE",
 		"AMTAIL_AST_OPCODE_RANGE_STEP",
+		"AMTAIL_AST_OPCODE_FUNC_EMIT_LOG",
 	};
 
 	if (opcode < sizeof(namecodes) / sizeof(namecodes[0]))

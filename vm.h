@@ -29,6 +29,8 @@ typedef struct amtail_named_split_array {
 typedef struct amtail_touch_callbacks {
 	void *userdata;
 	void (*on_var_touched)(void *userdata, amtail_variable *var);
+	/* Alligator extension: emit_log(str) → transformed log sink. Optional. */
+	void (*on_emit_log)(void *userdata, const char *data, size_t len);
 } amtail_touch_callbacks;
 
 typedef struct amtail_thread {

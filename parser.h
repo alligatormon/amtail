@@ -63,6 +63,7 @@
 #define AMTAIL_AST_OPCODE_RANGE_FOREACH 46 // range($array) as $x { ... } (AST only)
 #define AMTAIL_AST_OPCODE_RANGE 47 // runtime: enter range loop over named split array
 #define AMTAIL_AST_OPCODE_RANGE_STEP 48 // runtime: next range iteration
+#define AMTAIL_AST_OPCODE_FUNC_EMIT_LOG 49 // emit_log(str) → alligator log_channel_out (Alligator extension)
 
 typedef struct amtail_ast {
 	enum { gauge, counter } tag;
