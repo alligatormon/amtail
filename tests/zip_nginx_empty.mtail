@@ -1,0 +1,14 @@
+counter http_upstream_requests_total by upstream, status, http_host
+gauge http_upstream_response_time by upstream, http_host
+counter http_requests_total by status, cache_status, http_host, method
+
+/\{"timestamp":\s*"[^"]*","hostname":\s*"[^"]*","remote_addr":\s*"[^"]*","remote_user":\s*"[^"]*","bytes_sent":\s*(?P<bytes_sent>\d+),"request_time":\s*(?P<request_time>[0-9.]+),"request_id":\s*"[^"]*","request_id_any":\s*"[^"]*","status":\s*(?P<status>\d+),"http_host":\s*"(?P<http_host>[^"]*)","server_name":\s*"[^"]*","request":\s*"[^"]*","request_method":\s*"(?P<method>[^"]*)","http_referrer":\s*"[^"]*","http_user_agent":\s*"[^"]*","scheme":\s*"[^"]*","upstream_addr":\s*"(?P<upstream_addr>[^"]*)","upstream_status":\s*"(?P<upstream_status>[^"]*)","upstream_response_time":\s*"(?P<upstream_response_time>[^"]*)","uniq":\s*"[^"]*","cache_status":\s*"(?P<cache_status>[^"]*)"/ {
+  http_requests_total[$status][$cache_status][$http_host][$method]++
+  $addrs = split(",", $upstream_addr)
+  $ustatuses = split(",", $upstream_status)
+  $urts = split(",", $upstream_response_time)
+  zip($addrs, $ustatuses, $urts) as ($upstream, $ustatus, $urt) {
+    http_upstream_requests_total[$upstream][$ustatus][$http_host]++
+    http_upstream_response_time[$upstream][$http_host] = $urt
+  }
+}

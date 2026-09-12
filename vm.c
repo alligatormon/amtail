@@ -59,9 +59,14 @@ static void amtail_vm_captures_reset(amtail_thread *t)
 	t->split_storage = NULL;
 	t->split_count = 0;
 	t->split_index = 0;
-	t->split_bind_len = 0;
+	t->split_loop_limit = 0;
+	t->split_loop_arity = 0;
 	t->split_active = 0;
-	t->split_loop_array = NULL;
+	for (uint8_t i = 0; i < AMTAIL_ZIP_MAX; ++i)
+	{
+		t->split_bind_lens[i] = 0;
+		t->split_loop_arrays[i] = NULL;
+	}
 	amtail_vm_split_arrays_reset(t);
 }
 
@@ -220,16 +225,36 @@ static uint8_t amtail_vm_do_split(amtail_thread *t, const char *sep, size_t sep_
 			size_t chunk = (size_t)(end - cur);
 			if (chunk > 0 || t->split_count == 0)
 			{
-				t->split_parts[t->split_count].ptr = cur;
-				t->split_parts[t->split_count].len = (uint32_t)chunk;
+				const char *p = cur;
+				size_t n = chunk;
+				while (n > 0 && (*p == ' ' || *p == '\t'))
+				{
+					++p;
+					--n;
+				}
+				while (n > 0 && (p[n - 1] == ' ' || p[n - 1] == '\t'))
+					--n;
+				t->split_parts[t->split_count].ptr = p;
+				t->split_parts[t->split_count].len = (uint32_t)n;
 				++t->split_count;
 			}
 			break;
 		}
 
-		t->split_parts[t->split_count].ptr = cur;
-		t->split_parts[t->split_count].len = (uint32_t)(next - cur);
-		++t->split_count;
+		{
+			const char *p = cur;
+			size_t n = (size_t)(next - cur);
+			while (n > 0 && (*p == ' ' || *p == '\t'))
+			{
+				++p;
+				--n;
+			}
+			while (n > 0 && (p[n - 1] == ' ' || p[n - 1] == '\t'))
+				--n;
+			t->split_parts[t->split_count].ptr = p;
+			t->split_parts[t->split_count].len = (uint32_t)n;
+			++t->split_count;
+		}
 		cur = next + sep_len;
 	}
 
@@ -255,30 +280,38 @@ static void amtail_vm_split_publish_captures(amtail_thread *t)
 
 static void amtail_vm_split_bind_current(amtail_thread *t)
 {
-	if (!t || !t->split_bind_len || !t->split_loop_array)
+	if (!t || !t->split_loop_arity || !t->split_active)
 		return;
 
-	if (t->split_index >= t->split_loop_array->count)
+	if (t->split_index >= t->split_loop_limit)
 		return;
 
-	amtail_capture_slice slice = t->split_loop_array->parts[t->split_index];
-	uint8_t found = 0;
-	for (uint8_t i = 0; i < t->named_capture_count; ++i)
+	for (uint8_t a = 0; a < t->split_loop_arity && a < AMTAIL_ZIP_MAX; ++a)
 	{
-		if (t->named_captures[i].name_len == t->split_bind_len &&
-		    memcmp(t->named_captures[i].name, t->split_bind, t->split_bind_len) == 0)
+		if (!t->split_bind_lens[a] || !t->split_loop_arrays[a])
+			continue;
+		if (t->split_index >= t->split_loop_arrays[a]->count)
+			continue;
+
+		amtail_capture_slice slice = t->split_loop_arrays[a]->parts[t->split_index];
+		uint8_t found = 0;
+		for (uint8_t i = 0; i < t->named_capture_count; ++i)
 		{
-			t->named_captures[i].slice = slice;
-			found = 1;
-			break;
+			if (t->named_captures[i].name_len == t->split_bind_lens[a] &&
+			    memcmp(t->named_captures[i].name, t->split_binds[a], t->split_bind_lens[a]) == 0)
+			{
+				t->named_captures[i].slice = slice;
+				found = 1;
+				break;
+			}
 		}
-	}
-	if (!found && t->named_capture_count < AMTAIL_CAPTURE_MAX)
-	{
-		amtail_named_capture_slot *slot = &t->named_captures[t->named_capture_count++];
-		slot->name = t->split_bind;
-		slot->name_len = t->split_bind_len;
-		slot->slice = slice;
+		if (!found && t->named_capture_count < AMTAIL_CAPTURE_MAX)
+		{
+			amtail_named_capture_slot *slot = &t->named_captures[t->named_capture_count++];
+			slot->name = t->split_binds[a];
+			slot->name_len = t->split_bind_lens[a];
+			slot->slice = slice;
+		}
 	}
 }
 
@@ -336,23 +369,25 @@ static int amtail_vm_resolve_capture_token(const char *key, size_t token_len, am
 		if (amtail_vm_parse_index_token(idx_p, idx_len, variables, t, &idx))
 		{
 			amtail_named_split_array *arr = amtail_vm_split_array_find(t, p, name_len);
-			if (arr && idx < arr->count && arr->parts[idx].ptr && arr->parts[idx].len)
+			if (arr && idx < arr->count)
 			{
-				*emit = arr->parts[idx].ptr;
+				*emit = arr->parts[idx].ptr ? arr->parts[idx].ptr : "";
 				*emit_len = arr->parts[idx].len;
 				return 1;
 			}
 		}
 	}
 
-	if (t->split_active && t->split_bind_len && l == t->split_bind_len &&
-	    memcmp(p, t->split_bind, l) == 0 && t->split_loop_array &&
-	    t->split_index < t->split_loop_array->count)
+	if (t->split_active && t->split_loop_arity)
 	{
-		const amtail_capture_slice *slice = &t->split_loop_array->parts[t->split_index];
-		if (slice->ptr && slice->len)
+		for (uint8_t a = 0; a < t->split_loop_arity && a < AMTAIL_ZIP_MAX; ++a)
 		{
-			*emit = slice->ptr;
+			if (!t->split_bind_lens[a] || l != t->split_bind_lens[a] ||
+			    memcmp(p, t->split_binds[a], l) != 0 || !t->split_loop_arrays[a] ||
+			    t->split_index >= t->split_loop_arrays[a]->count)
+				continue;
+			const amtail_capture_slice *slice = &t->split_loop_arrays[a]->parts[t->split_index];
+			*emit = slice->ptr ? slice->ptr : "";
 			*emit_len = slice->len;
 			return 1;
 		}
@@ -383,10 +418,10 @@ static int amtail_vm_resolve_capture_token(const char *key, size_t token_len, am
 	for (uint8_t i = 0; i < t->named_capture_count; ++i)
 	{
 		if (t->named_captures[i].name_len == l &&
-		    memcmp(t->named_captures[i].name, p, l) == 0 &&
-		    t->named_captures[i].slice.ptr && t->named_captures[i].slice.len)
+		    memcmp(t->named_captures[i].name, p, l) == 0)
 		{
-			*emit = t->named_captures[i].slice.ptr;
+			/* Empty captures (len==0) are valid — e.g. JSON "" fields. */
+			*emit = t->named_captures[i].slice.ptr ? t->named_captures[i].slice.ptr : "";
 			*emit_len = t->named_captures[i].slice.len;
 			return 1;
 		}
@@ -396,7 +431,8 @@ static int amtail_vm_resolve_capture_token(const char *key, size_t token_len, am
 
 static void amtail_vm_named_capture_set(amtail_thread *t, const char *name, size_t gnlen, const char *ptr, uint32_t len)
 {
-	if (!t || !name || !gnlen || !ptr || !len)
+	/* Allow empty matches (len==0); reject only missing name/ptr. */
+	if (!t || !name || !gnlen || !ptr)
 		return;
 	if (gnlen > 255)
 		gnlen = 255;
@@ -887,8 +923,12 @@ static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables
 	{
 		const char *emit = NULL;
 		size_t emit_len = 0;
-		if (t && amtail_vm_resolve_capture_token(op->export_name->s, op->export_name->l, t, variables, &emit, &emit_len) && emit_len)
+		/* Honor empty captures (emit_len==0) so "" does not fall through to "0".
+		 * string_init_alloc(p, 0) uses strlen(p) — use "" for empty. */
+		if (t && amtail_vm_resolve_capture_token(op->export_name->s, op->export_name->l, t, variables, &emit, &emit_len))
 		{
+			if (emit_len == 0)
+				return strdup("");
 			char *copy = malloc(emit_len + 1);
 			if (!copy)
 				return NULL;
@@ -903,6 +943,13 @@ static char* amtail_vm_resolve_string(amtail_byteop *op, alligator_ht *variables
 			amtail_variable *var = alligator_ht_search_nolock(variables, amtail_variable_compare,
 			                                           &lk,
 			                                           amtail_hash(op->export_name->s, op->export_name->l));
+			if (!var && op->export_name->s[0] == '$' && op->export_name->l > 1)
+			{
+				lk.p = op->export_name->s + 1;
+				lk.l = op->export_name->l - 1;
+				var = alligator_ht_search_nolock(variables, amtail_variable_compare,
+				                                 &lk, amtail_hash((char *)lk.p, lk.l));
+			}
 			if (var)
 			{
 				if (var->type == ALLIGATOR_VARTYPE_TEXT && var->s && var->s->s)
@@ -1001,12 +1048,13 @@ static char *amtail_vm_lookup_variable_string(const char *name, alligator_ht *va
 
 	const char *emit = NULL;
 	size_t emit_len = 0;
-	if (t && amtail_vm_resolve_capture_token(name, strlen(name), t, variables, &emit, &emit_len) && emit_len)
+	if (t && amtail_vm_resolve_capture_token(name, strlen(name), t, variables, &emit, &emit_len))
 	{
 		char *copy = malloc(emit_len + 1);
 		if (!copy)
 			return NULL;
-		memcpy(copy, emit, emit_len);
+		if (emit_len)
+			memcpy(copy, emit, emit_len);
 		copy[emit_len] = '\0';
 		return copy;
 	}
@@ -1272,10 +1320,16 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 	{
 		const char *emit = NULL;
 		size_t emit_len = 0;
-		if (amtail_vm_resolve_capture_token(byte_ops->export_name->s, byte_ops->export_name->l, amt_thread, variables, &emit, &emit_len) && emit_len)
+		/* Empty captures are valid TEXT "" — do not fall through to counter 0.
+		 * string_init_alloc(p, 0) means strlen(p); never pass emit_len==0 with
+		 * emit pointing mid-line or the rest of the log is copied. */
+		if (amtail_vm_resolve_capture_token(byte_ops->export_name->s, byte_ops->export_name->l, amt_thread, variables, &emit, &emit_len))
 		{
 			resolved->vartype = ALLIGATOR_VARTYPE_TEXT;
-			resolved->ls = string_init_alloc((char*)emit, emit_len);
+			if (emit_len == 0)
+				resolved->ls = string_init_alloc("", 0);
+			else
+				resolved->ls = string_init_alloc((char *)emit, emit_len);
 			return;
 		}
 	}
@@ -1877,25 +1931,62 @@ void amtail_vmfunc_range(amtail_thread *amt_thread, amtail_byteop *byte_ops, all
 {
 	(void)logline;
 	(void)variables;
+	(void)amtail_ll;
 	amt_thread->split_active = 0;
 	amt_thread->split_index = 0;
-	amt_thread->split_loop_array = NULL;
+	amt_thread->split_loop_limit = 0;
+	amt_thread->split_loop_arity = 0;
+	for (uint8_t i = 0; i < AMTAIL_ZIP_MAX; ++i)
+	{
+		amt_thread->split_bind_lens[i] = 0;
+		amt_thread->split_loop_arrays[i] = NULL;
+	}
 
-	if (!byte_ops->ls || !byte_ops->ls->s || !byte_ops->rs || !byte_ops->rs->s)
+	uint8_t arity = byte_ops->loop_arity;
+	if (!arity && byte_ops->ls && byte_ops->ls->s && byte_ops->rs && byte_ops->rs->s)
+		arity = 1;
+	if (!arity || arity > AMTAIL_ZIP_MAX)
 		return;
 
-	amtail_named_split_array *arr = amtail_vm_split_array_find(amt_thread, byte_ops->rs->s, byte_ops->rs->l);
-	if (!arr || !arr->count)
+	uint8_t limit = 0;
+	uint8_t limit_set = 0;
+	for (uint8_t i = 0; i < arity; ++i)
+	{
+		string *aname = byte_ops->loop_arrays[i];
+		string *bname = byte_ops->loop_binds[i];
+		if ((!aname || !aname->s) && i == 0 && byte_ops->rs)
+			aname = byte_ops->rs;
+		if ((!bname || !bname->s) && i == 0 && byte_ops->ls)
+			bname = byte_ops->ls;
+		if (!aname || !aname->s || !bname || !bname->s)
+			return;
+
+		amtail_named_split_array *arr = amtail_vm_split_array_find(amt_thread, aname->s, aname->l);
+		if (!arr)
+			return;
+
+		uint8_t bind_len = (uint8_t)bname->l;
+		if (bind_len >= AMTAIL_SPLIT_BIND_MAX)
+			bind_len = AMTAIL_SPLIT_BIND_MAX - 1;
+		memcpy(amt_thread->split_binds[i], bname->s, bind_len);
+		amt_thread->split_binds[i][bind_len] = '\0';
+		amt_thread->split_bind_lens[i] = bind_len;
+		amt_thread->split_loop_arrays[i] = arr;
+
+		if (!limit_set)
+		{
+			limit = arr->count;
+			limit_set = 1;
+		}
+		else if (arr->count < limit)
+			limit = arr->count;
+	}
+
+	if (!limit_set || !limit)
 		return;
 
-	uint8_t bind_len = (uint8_t)byte_ops->ls->l;
-	if (bind_len >= AMTAIL_SPLIT_BIND_MAX)
-		bind_len = AMTAIL_SPLIT_BIND_MAX - 1;
-	memcpy(amt_thread->split_bind, byte_ops->ls->s, bind_len);
-	amt_thread->split_bind[bind_len] = '\0';
-	amt_thread->split_bind_len = bind_len;
-
-	amt_thread->split_loop_array = arr;
+	amt_thread->split_loop_arity = arity;
+	amt_thread->split_loop_limit = limit;
 	amt_thread->split_active = 1;
 	amt_thread->split_index = 0;
 	amtail_vm_split_bind_current(amt_thread);
@@ -1912,10 +2003,13 @@ void amtail_vmfunc_range_step(amtail_thread *amt_thread, amtail_byteop *byte_ops
 		return;
 
 	++amt_thread->split_index;
-	if (!amt_thread->split_loop_array || amt_thread->split_index >= amt_thread->split_loop_array->count)
+	if (amt_thread->split_index >= amt_thread->split_loop_limit)
 	{
 		amt_thread->split_active = 0;
-		amt_thread->split_loop_array = NULL;
+		amt_thread->split_loop_arity = 0;
+		amt_thread->split_loop_limit = 0;
+		for (uint8_t i = 0; i < AMTAIL_ZIP_MAX; ++i)
+			amt_thread->split_loop_arrays[i] = NULL;
 		return;
 	}
 
@@ -2928,6 +3022,9 @@ int amtail_execute(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator
 		amtail_vmfunc_range(amt_thread, byte_ops, variables, logline, amtail_ll);
 		if (amt_thread->split_active && byte_ops->right_opcounter)
 			return 3;
+		/* Empty / unresolved zip/range: skip body by jumping to RANGE_STEP. */
+		if (byte_ops->step_opcounter)
+			return 5;
 		return 1;
 	}
 	else if (byte_ops->opcode == AMTAIL_AST_OPCODE_RANGE_STEP)
@@ -3099,6 +3196,12 @@ int amtail_run_file(amtail_bytecode* byte_code, alligator_ht *variables, string*
 				uint64_t body = byte_ops[i].li;
 				if (body)
 					i = body - 1;
+			}
+			else if (rc == 5) // split-foreach: skip empty body (land on RANGE_STEP, ++i continues)
+			{
+				uint64_t step_pc = byte_ops[i].step_opcounter;
+				if (step_pc)
+					i = step_pc;
 			}
 			else if (!rc)
 			{

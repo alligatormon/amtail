@@ -59,14 +59,16 @@ typedef struct amtail_thread {
     amtail_capture_slice split_parts[AMTAIL_SPLIT_MAX];
     uint8_t split_count;
     uint8_t split_index;
-    char split_bind[AMTAIL_SPLIT_BIND_MAX];
-    uint8_t split_bind_len;
+    uint8_t split_loop_limit;
+    uint8_t split_loop_arity;
     uint8_t split_active;
+    char split_binds[AMTAIL_ZIP_MAX][AMTAIL_SPLIT_BIND_MAX];
+    uint8_t split_bind_lens[AMTAIL_ZIP_MAX];
     /* Named split results: $responses = split(",", $field) */
     amtail_named_split_array split_arrays[AMTAIL_SPLIT_ARRAYS_MAX];
     uint8_t split_array_count;
-    /* During range() / split-as loops: iteration source array (not owned). */
-    amtail_named_split_array *split_loop_array;
+    /* During range()/zip() loops: iteration source arrays (not owned). */
+    amtail_named_split_array *split_loop_arrays[AMTAIL_ZIP_MAX];
 } amtail_thread;
 
 amtail_thread *amtail_thread_init(void);

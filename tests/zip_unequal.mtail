@@ -1,0 +1,9 @@
+gauge upstream_rt by server
+
+/(?P<rt>[^ ]+) (?P<sv>[^ ]+)/ {
+  $responses = split(",", $rt)
+  $servers = split(",", $sv)
+  zip($servers, $responses) as ($server, $rtv) {
+    upstream_rt[$server] = $rtv
+  }
+}

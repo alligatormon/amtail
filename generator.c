@@ -251,10 +251,31 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
 
 	if (fill->opcode == AMTAIL_AST_OPCODE_RANGE)
 	{
-		if (ast->name && ast->name->s)
-			fill->ls = string_string_init_dup(ast->name);
-		if (ast->svalue && ast->svalue->s)
-			fill->rs = string_string_init_dup(ast->svalue);
+		uint8_t arity = ast->loop_arity;
+		if (arity > AMTAIL_ZIP_MAX)
+			arity = AMTAIL_ZIP_MAX;
+		if (!arity && ast->name && ast->name->s && ast->svalue && ast->svalue->s)
+			arity = 1;
+
+		fill->loop_arity = arity;
+		for (uint8_t i = 0; i < arity; ++i)
+		{
+			if (ast->loop_arrays[i] && ast->loop_arrays[i]->s)
+				fill->loop_arrays[i] = string_string_init_dup(ast->loop_arrays[i]);
+			else if (i == 0 && ast->svalue && ast->svalue->s)
+				fill->loop_arrays[i] = string_string_init_dup(ast->svalue);
+
+			if (ast->loop_binds[i] && ast->loop_binds[i]->s)
+				fill->loop_binds[i] = string_string_init_dup(ast->loop_binds[i]);
+			else if (i == 0 && ast->name && ast->name->s)
+				fill->loop_binds[i] = string_string_init_dup(ast->name);
+		}
+
+		/* Legacy single-array fields (arity-1 helpers / debug). */
+		if (fill->loop_binds[0])
+			fill->ls = string_string_init_dup(fill->loop_binds[0]);
+		if (fill->loop_arrays[0])
+			fill->rs = string_string_init_dup(fill->loop_arrays[0]);
 	}
 	if (fill->opcode == AMTAIL_AST_OPCODE_VARIABLE)
 	{
@@ -447,6 +468,7 @@ static void amtail_bytecode_walk_iterative(amtail_bytecode *byte_code, amtail_as
 			if (f->foreach_pc < byte_code->l)
 			{
 				byte_code->ops[f->foreach_pc].right_opcounter = f->foreach_body_pc;
+				byte_code->ops[f->foreach_pc].step_opcounter = step_pc;
 				byte_code->ops[step_pc].li = f->foreach_body_pc;
 				byte_code->ops[step_pc].ri = f->foreach_pc;
 			}
@@ -512,6 +534,13 @@ void amtail_code_free(amtail_bytecode *byte_code)
 				string_free(ops->ls);
 			if (ops->rs)
 				string_free(ops->rs);
+			for (uint8_t j = 0; j < ops->loop_arity && j < AMTAIL_ZIP_MAX; ++j)
+			{
+				if (ops->loop_arrays[j])
+					string_free(ops->loop_arrays[j]);
+				if (ops->loop_binds[j])
+					string_free(ops->loop_binds[j]);
+			}
 		}
 
 		if (ops->re_match)

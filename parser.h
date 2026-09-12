@@ -60,10 +60,13 @@
 #define AMTAIL_AST_OPCODE_VAR 43 // use variable
 #define AMTAIL_AST_OPCODE_RUN 44 // expression is ended, should be calculate and assign
 #define AMTAIL_AST_OPCODE_FUNC_SPLIT 45 // split(sep, str) -> count; stores named array on assign
-#define AMTAIL_AST_OPCODE_RANGE_FOREACH 46 // range($array) as $x { ... } (AST only)
-#define AMTAIL_AST_OPCODE_RANGE 47 // runtime: enter range loop over named split array
-#define AMTAIL_AST_OPCODE_RANGE_STEP 48 // runtime: next range iteration
+#define AMTAIL_AST_OPCODE_RANGE_FOREACH 46 // range/zip(...) as ... { ... } (AST only)
+#define AMTAIL_AST_OPCODE_RANGE 47 // runtime: enter range/zip loop over named split array(s)
+#define AMTAIL_AST_OPCODE_RANGE_STEP 48 // runtime: next range/zip iteration
 #define AMTAIL_AST_OPCODE_FUNC_EMIT_LOG 49 // emit_log(str) → alligator log_channel_out (Alligator extension)
+
+/* Max parallel arrays/binds for zip($a,$b,...) as ($x,$y,...) / multi-array range. */
+#define AMTAIL_ZIP_MAX 8
 
 typedef struct amtail_ast {
 	enum { gauge, counter } tag;
@@ -77,6 +80,10 @@ typedef struct amtail_ast {
 	uint8_t vartype;
 	uint8_t facttype;
 	uint8_t hidden;
+	/* range/zip: array names (with or without $) and bind names (without $). */
+	string *loop_arrays[AMTAIL_ZIP_MAX];
+	string *loop_binds[AMTAIL_ZIP_MAX];
+	uint8_t loop_arity;
 	union {
 		double dvalue;
 		int64_t ivalue;

@@ -1,0 +1,13 @@
+# Outer named capture ($proto) must survive an inner delays= match.
+counter nested_delivery_messages by proto
+histogram nested_delivery_delay buckets 0.1, 0.5, 1, 30 by proto, what
+
+/postfix\/(?P<proto>lmtp|smtp|error|local)\[\d+\]: / {
+	/delays=(?P<delay_before_qmgr>[\d.]+)\/(?P<delay_in_qmgr>[\d.]+)\/(?P<delay_conn_setup>[\d.]+)\/(?P<delay_xmit>[\d.]+)/ {
+		nested_delivery_messages[$proto]++
+		nested_delivery_delay[$proto]["before qmgr"] = $delay_before_qmgr
+		nested_delivery_delay[$proto]["in qmgr"] = $delay_in_qmgr
+		nested_delivery_delay[$proto]["connection setup"] = $delay_conn_setup
+		nested_delivery_delay[$proto]["message transmit"] = $delay_xmit
+	}
+}

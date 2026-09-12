@@ -62,10 +62,22 @@ void amtail_ast_free(amtail_ast *ast)
 		}
 	}
 
+	for (uint8_t i = 0; i < ast->loop_arity && i < AMTAIL_ZIP_MAX; ++i)
+	{
+		if (ast->loop_arrays[i])
+			string_free(ast->loop_arrays[i]);
+		if (ast->loop_binds[i])
+			string_free(ast->loop_binds[i]);
+	}
+
 	if (ast->opcode == AMTAIL_AST_OPCODE_VARIABLE &&
 	    (ast->vartype == ALLIGATOR_VARTYPE_TEXT || ast->vartype == ALLIGATOR_VARTYPE_CONST) &&
 	    ast->facttype == ALLIGATOR_FACTTYPE_TEXT &&
 	    ast->svalue)
+	{
+		string_free(ast->svalue);
+	}
+	else if (ast->opcode == AMTAIL_AST_OPCODE_RANGE_FOREACH && ast->svalue)
 	{
 		string_free(ast->svalue);
 	}
@@ -572,8 +584,12 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 								if (j < tokens->l && !strcmp(tokens->str[j]->s, "{"))
 								{
 									cur->opcode = AMTAIL_AST_OPCODE_RANGE_FOREACH;
-									cur->svalue = array_tok;
-									cur->name = string_init_alloc(bind_tok->s + 1, bind_tok->l - 1);
+									cur->loop_arity = 1;
+									cur->loop_arrays[0] = array_tok;
+									cur->loop_binds[0] = string_init_alloc(bind_tok->s + 1, bind_tok->l - 1);
+									/* Keep legacy fields for debug / older paths. */
+									cur->svalue = string_string_init_dup(array_tok);
+									cur->name = string_string_init_dup(cur->loop_binds[0]);
 									i = j - 1;
 									last_token = tok;
 									continue;
@@ -585,6 +601,104 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 					if (array_tok)
 						string_free(array_tok);
 				}
+			}
+		}
+
+		if (!strcmp(t, "zip"))
+		{
+			uint64_t j = i + 1;
+			if (j < tokens->l && !strcmp(tokens->str[j]->s, "("))
+			{
+				j++;
+				string *arrays[AMTAIL_ZIP_MAX];
+				uint8_t n_arrays = 0;
+				int ok = 1;
+				memset(arrays, 0, sizeof(arrays));
+				/* Commas are lexer delimiters and are not present as tokens. */
+				while (j < tokens->l && n_arrays < AMTAIL_ZIP_MAX)
+				{
+					if (!strcmp(tokens->str[j]->s, ")"))
+						break;
+					if (!strcmp(tokens->str[j]->s, ","))
+					{
+						j++;
+						continue;
+					}
+					arrays[n_arrays++] = string_string_init_dup(tokens->str[j]);
+					j++;
+				}
+				if (ok && n_arrays > 0 && j < tokens->l && !strcmp(tokens->str[j]->s, ")"))
+				{
+					j++;
+					if (j < tokens->l && !strcmp(tokens->str[j]->s, "as"))
+					{
+						j++;
+						string *binds[AMTAIL_ZIP_MAX];
+						uint8_t n_binds = 0;
+						memset(binds, 0, sizeof(binds));
+						int binds_ok = 0;
+
+						if (j < tokens->l && !strcmp(tokens->str[j]->s, "("))
+						{
+							j++;
+							binds_ok = 1;
+							while (j < tokens->l && n_binds < AMTAIL_ZIP_MAX)
+							{
+								if (!strcmp(tokens->str[j]->s, ")"))
+									break;
+								if (!strcmp(tokens->str[j]->s, ","))
+								{
+									j++;
+									continue;
+								}
+								if (tokens->str[j]->s[0] != '$' || tokens->str[j]->l < 2)
+								{
+									binds_ok = 0;
+									break;
+								}
+								binds[n_binds++] = string_init_alloc(tokens->str[j]->s + 1, tokens->str[j]->l - 1);
+								j++;
+							}
+							if (!(binds_ok && n_binds > 0 && j < tokens->l && !strcmp(tokens->str[j]->s, ")")))
+								binds_ok = 0;
+							else
+								j++;
+						}
+						else if (j < tokens->l && tokens->str[j]->s[0] == '$' && n_arrays == 1)
+						{
+							/* zip($a) as $x { ... } */
+							binds[0] = string_init_alloc(tokens->str[j]->s + 1, tokens->str[j]->l - 1);
+							n_binds = 1;
+							binds_ok = 1;
+							j++;
+						}
+
+						if (binds_ok && n_binds == n_arrays && j < tokens->l && !strcmp(tokens->str[j]->s, "{"))
+						{
+							cur->opcode = AMTAIL_AST_OPCODE_RANGE_FOREACH;
+							cur->loop_arity = n_arrays;
+							for (uint8_t k = 0; k < n_arrays; ++k)
+							{
+								cur->loop_arrays[k] = arrays[k];
+								cur->loop_binds[k] = binds[k];
+								arrays[k] = NULL;
+								binds[k] = NULL;
+							}
+							cur->svalue = string_string_init_dup(cur->loop_arrays[0]);
+							cur->name = string_string_init_dup(cur->loop_binds[0]);
+							i = j - 1;
+							last_token = tok;
+							continue;
+						}
+
+						for (uint8_t k = 0; k < n_binds; ++k)
+							if (binds[k])
+								string_free(binds[k]);
+					}
+				}
+				for (uint8_t k = 0; k < n_arrays; ++k)
+					if (arrays[k])
+						string_free(arrays[k]);
 			}
 		}
 
