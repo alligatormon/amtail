@@ -394,13 +394,41 @@ static int amtail_vm_resolve_capture_token(const char *key, size_t token_len, am
 	return 0;
 }
 
+static void amtail_vm_named_capture_set(amtail_thread *t, const char *name, size_t gnlen, const char *ptr, uint32_t len)
+{
+	if (!t || !name || !gnlen || !ptr || !len)
+		return;
+	if (gnlen > 255)
+		gnlen = 255;
+
+	for (uint8_t i = 0; i < t->named_capture_count; ++i)
+	{
+		if (t->named_captures[i].name_len == gnlen &&
+		    memcmp(t->named_captures[i].name, name, gnlen) == 0)
+		{
+			t->named_captures[i].name = name;
+			t->named_captures[i].slice.ptr = ptr;
+			t->named_captures[i].slice.len = len;
+			return;
+		}
+	}
+
+	if (t->named_capture_count >= AMTAIL_CAPTURE_MAX)
+		return;
+	amtail_named_capture_slot *slot = &t->named_captures[t->named_capture_count++];
+	slot->name = name;
+	slot->name_len = (uint8_t)gnlen;
+	slot->slice.ptr = ptr;
+	slot->slice.len = len;
+}
+
 static void amtail_vm_apply_named_captures(amtail_thread *t, regex_match *rematch, char *line, uint64_t line_size, const int *ovector, int count)
 {
 	if (!t || !rematch || !line || !line_size || !rematch->regex_compiled || !ovector || count <= 0)
 		return;
 
-	t->named_capture_count = 0;
-
+	/* Nested matches must merge named groups. Resetting here drops outer
+	 * captures such as $proto when an inner $rest =~ /delays=(?P<...>/ runs. */
 	int namecount = rematch->pcre_name_count;
 	int entry_size = rematch->pcre_name_entry_size;
 	const unsigned char *name_table = rematch->pcre_name_table;
@@ -427,13 +455,7 @@ static void amtail_vm_apply_named_captures(amtail_thread *t, regex_match *rematc
 		if (!gnlen)
 			continue;
 
-		if (t->named_capture_count >= AMTAIL_CAPTURE_MAX)
-			break;
-		amtail_named_capture_slot *slot = &t->named_captures[t->named_capture_count++];
-		slot->name = group_name;
-		slot->name_len = (uint8_t)gnlen;
-		slot->slice.ptr = line + start;
-		slot->slice.len = (uint32_t)(end - start);
+		amtail_vm_named_capture_set(t, group_name, gnlen, line + start, (uint32_t)(end - start));
 	}
 }
 

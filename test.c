@@ -435,6 +435,21 @@ static int runtime_expect_histogram_count(alligator_ht *variables, const char *n
 	return var && var->type == ALLIGATOR_VARTYPE_HISTOGRAM && var->histogram_count == expect;
 }
 
+static int runtime_expect_histogram_key(alligator_ht *variables, const char *key, uint64_t expect)
+{
+	size_t kl = strlen(key);
+	amtail_lookup_key lk = { key, kl };
+	amtail_variable *var = alligator_ht_search(variables, amtail_variable_compare, &lk, amtail_hash((char*)key, kl));
+	return var && !var->is_template && var->type == ALLIGATOR_VARTYPE_HISTOGRAM && var->histogram_count == expect;
+}
+
+static int runtime_expect_absent(alligator_ht *variables, const char *key)
+{
+	size_t kl = strlen(key);
+	amtail_lookup_key lk = { key, kl };
+	return alligator_ht_search(variables, amtail_variable_compare, &lk, amtail_hash((char*)key, kl)) == NULL;
+}
+
 static int runtime_expect_counter_key(alligator_ht *variables, const char *key, int64_t expect)
 {
 	size_t kl = strlen(key);
@@ -995,6 +1010,58 @@ static int vm_runtime_test_strptime_and_match(void)
 	return ok;
 }
 
+static int vm_runtime_test_nested_named_capture(void)
+{
+	amtail_log_level amtail_ll = {0};
+	const char *script_path = "tests/nested_named_capture.mtail";
+	const char *log_line =
+		"Aug 27 12:00:00 host postfix/smtp[123]: ABCDEF: to=<a@b>, relay=x, delay=1, "
+		"delays=0.1/0.2/0.3/0.4, dsn=2.0.0, status=sent (ok)\n";
+
+	string *src = string_init_dup((char*)script_path);
+	string_tokens *tokens = amtail_lex(src, (char*)script_path, amtail_ll);
+	if (!tokens)
+	{
+		string_free(src);
+		return 0;
+	}
+	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
+	if (!ast)
+	{
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
+	if (!byte_code)
+	{
+		amtail_ast_free(ast);
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+
+	alligator_ht *variables = amtail_variables_init();
+	string *line = string_init_dup((char*)log_line);
+	int rc = amtail_run(byte_code, variables, line, amtail_ll, NULL, NULL);
+	int ok = rc &&
+	         runtime_expect_counter_key(variables, "nested_delivery_messages[smtp]", 1) &&
+	         runtime_expect_histogram_key(variables, "nested_delivery_delay[smtp][\"before qmgr\"]", 1) &&
+	         runtime_expect_histogram_key(variables, "nested_delivery_delay[smtp][\"in qmgr\"]", 1) &&
+	         runtime_expect_histogram_key(variables, "nested_delivery_delay[smtp][\"connection setup\"]", 1) &&
+	         runtime_expect_histogram_key(variables, "nested_delivery_delay[smtp][\"message transmit\"]", 1) &&
+	         runtime_expect_absent(variables, "nested_delivery_messages[$proto]") &&
+	         runtime_expect_absent(variables, "nested_delivery_delay[$proto][\"before qmgr\"]");
+
+	string_free(line);
+	amtail_variables_free(variables);
+	amtail_code_free(byte_code);
+	amtail_ast_free(ast);
+	string_tokens_free(tokens);
+	string_free(src);
+	return ok;
+}
+
 static int vm_runtime_test_keyed_counter_inc(void)
 {
 	amtail_log_level amtail_ll = {0};
@@ -1144,16 +1211,17 @@ static int vm_runtime_tests(void)
 	int rc_subst = vm_runtime_test_subst();
 	int rc_settime_strptime = vm_runtime_test_settime_strptime();
 	int rc_source = vm_runtime_test_mtail_source_functions();
+	int rc_nested = vm_runtime_test_nested_named_capture();
 	int rc_keyed = vm_runtime_test_keyed_counter_inc();
 	int rc_beanstalkd = vm_runtime_test_beanstalkd_named_gauge();
 	int rc_split = vm_runtime_test_split_parallel();
 	int ok = rc_timestamp && rc_len_strtol && rc_strptime_match &&
 	         rc_tolower && rc_getfilename && rc_getfilename_branch && rc_dual_variables && rc_subst && rc_settime_strptime &&
-	         rc_source && rc_keyed && rc_beanstalkd && rc_split;
+	         rc_source && rc_nested && rc_keyed && rc_beanstalkd && rc_split;
 	printf("[VM] timestamp=%d len_strtol=%d strptime_match=%d tolower=%d "
-	       "getfilename=%d getfilename_branch=%d dual_variables=%d subst=%d settime_strptime=%d source=%d keyed=%d beanstalkd=%d split=%d\n",
+	       "getfilename=%d getfilename_branch=%d dual_variables=%d subst=%d settime_strptime=%d source=%d nested=%d keyed=%d beanstalkd=%d split=%d\n",
 	       rc_timestamp, rc_len_strtol, rc_strptime_match, rc_tolower,
-	       rc_getfilename, rc_getfilename_branch, rc_dual_variables, rc_subst, rc_settime_strptime, rc_source, rc_keyed, rc_beanstalkd, rc_split);
+	       rc_getfilename, rc_getfilename_branch, rc_dual_variables, rc_subst, rc_settime_strptime, rc_source, rc_nested, rc_keyed, rc_beanstalkd, rc_split);
 	if (!ok)
 		printf("[FAIL][VM] runtime feature tests\n");
 	else
@@ -1183,6 +1251,7 @@ int main(int argc, char **argv)
 		"tests/lighttpd.mtail",
 		"tests/linecount.mtail",
 		"tests/mysql_slowqueries.mtail",
+		"tests/nested_named_capture.mtail",
 		"tests/nginx.mtail",
 		"tests/nocode.mtail",
 		"tests/nginx-mail-histogram.mtail",
