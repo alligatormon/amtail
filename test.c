@@ -1399,6 +1399,62 @@ static int vm_runtime_test_beanstalkd_named_gauge(void)
 	return ok;
 }
 
+static int vm_runtime_test_custom_service(void)
+{
+	amtail_log_level amtail_ll = {0};
+	const char *script_path = "tests/custom_service.mtail";
+	/* Sample lines formerly in log2/custom_service.log */
+	const char *log_line =
+		"store\tSVC.Master.Service.replicator.ProcessAvail\t0\t1776959656\n"
+		"store\tSVC.Master.Service.replicator.ProcessCount\t0\t1776959656\n"
+		"store\tSVC.Master.Service.pop3.ProcessAvail\t1\t1776959656\n"
+		"store\tSVC.Master.Service.pop3.ProcessCount\t1\t1776959656\n"
+		"store\tSVC.Master.Service.imap-login.ProcessAvail\t1\t1776959656\n"
+		"store\tSVC.Master.Service.imap-login.ProcessCount\t1\t1776959656\n";
+
+	string *src = string_init_dup((char*)script_path);
+	string_tokens *tokens = amtail_lex(src, (char*)script_path, amtail_ll);
+	if (!tokens)
+	{
+		string_free(src);
+		return 0;
+	}
+	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
+	if (!ast)
+	{
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
+	if (!byte_code)
+	{
+		amtail_ast_free(ast);
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+
+	alligator_ht *variables = amtail_variables_init();
+	string *line = string_init_dup((char*)log_line);
+	int rc = amtail_run(byte_code, variables, line, amtail_ll, NULL, NULL);
+	int ok = rc &&
+	         runtime_expect_counter_key(variables, "master_service_process_avail_total[replicator]", 0) &&
+	         runtime_expect_counter_key(variables, "master_service_process_count_total[replicator]", 0) &&
+	         runtime_expect_counter_key(variables, "master_service_process_avail_total[pop3]", 1) &&
+	         runtime_expect_counter_key(variables, "master_service_process_count_total[pop3]", 1) &&
+	         runtime_expect_counter_key(variables, "master_service_process_avail_total[imap-login]", 1) &&
+	         runtime_expect_counter_key(variables, "master_service_process_count_total[imap-login]", 1);
+
+	string_free(line);
+	amtail_variables_free(variables);
+	amtail_code_free(byte_code);
+	amtail_ast_free(ast);
+	string_tokens_free(tokens);
+	string_free(src);
+	return ok;
+}
+
 static int vm_runtime_tests(void)
 {
 	int rc_timestamp = vm_runtime_test_timestamp();
@@ -1414,6 +1470,7 @@ static int vm_runtime_tests(void)
 	int rc_nested = vm_runtime_test_nested_named_capture();
 	int rc_keyed = vm_runtime_test_keyed_counter_inc();
 	int rc_beanstalkd = vm_runtime_test_beanstalkd_named_gauge();
+	int rc_custom_service = vm_runtime_test_custom_service();
 	int rc_split = vm_runtime_test_split_parallel();
 	int rc_zip = vm_runtime_test_zip_parallel();
 	int rc_zip_unequal = vm_runtime_test_zip_unequal();
@@ -1421,13 +1478,13 @@ static int vm_runtime_tests(void)
 	int rc_zip_arity = vm_runtime_test_zip_arity_mismatch();
 	int ok = rc_timestamp && rc_len_strtol && rc_strptime_match &&
 	         rc_tolower && rc_getfilename && rc_getfilename_branch && rc_dual_variables && rc_subst && rc_settime_strptime &&
-	         rc_source && rc_nested && rc_keyed && rc_beanstalkd && rc_split &&
+	         rc_source && rc_nested && rc_keyed && rc_beanstalkd && rc_custom_service && rc_split &&
 	         rc_zip && rc_zip_unequal && rc_zip_empty && rc_zip_arity;
 	printf("[VM] timestamp=%d len_strtol=%d strptime_match=%d tolower=%d "
-	       "getfilename=%d getfilename_branch=%d dual_variables=%d subst=%d settime_strptime=%d source=%d nested=%d keyed=%d beanstalkd=%d split=%d "
+	       "getfilename=%d getfilename_branch=%d dual_variables=%d subst=%d settime_strptime=%d source=%d nested=%d keyed=%d beanstalkd=%d custom_service=%d split=%d "
 	       "zip=%d zip_unequal=%d zip_empty=%d zip_arity=%d\n",
 	       rc_timestamp, rc_len_strtol, rc_strptime_match, rc_tolower,
-	       rc_getfilename, rc_getfilename_branch, rc_dual_variables, rc_subst, rc_settime_strptime, rc_source, rc_nested, rc_keyed, rc_beanstalkd, rc_split,
+	       rc_getfilename, rc_getfilename_branch, rc_dual_variables, rc_subst, rc_settime_strptime, rc_source, rc_nested, rc_keyed, rc_beanstalkd, rc_custom_service, rc_split,
 	       rc_zip, rc_zip_unequal, rc_zip_empty, rc_zip_arity);
 	if (!ok)
 		printf("[FAIL][VM] runtime feature tests\n");
@@ -1452,6 +1509,7 @@ int main(int argc, char **argv)
 		"tests/apache_combined.mtail",
 		"tests/apache_common.mtail",
 		"tests/apache_metrics.mtail",
+		"tests/custom_service.mtail",
 		"tests/dhcpd.mtail",
 		"tests/getfilename_branch.mtail",
 		"tests/histogram.mtail",
