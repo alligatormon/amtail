@@ -27,5 +27,6 @@ Related: `range($arr) as $x { }` walks a single split array.
 |------|----------------|
 | [`zip_basic.mtail`](zip_basic.mtail) | Parallel upstream fields → per-peer metrics |
 | [`nginx_json.mtail`](nginx_json.mtail) | Nginx JSON access log: `","` retries, `" : "` fallback, histograms |
+| [`nginx_error.mtail`](nginx_error.mtail) | Nginx `error_log`: severity + kind (+ server/zone/check-peer) |
 
 Automated tests live under `tests/zip_*.mtail`.

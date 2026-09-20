@@ -1,0 +1,281 @@
+# Nginx error_log → metrics (alligator / amtail)
+#
+# Typical line:
+#   2026/09/20 00:02:36 [warn] 179003#179003: *3060044769 …, client: …, server: vhost, request: "GET /… HTTP/1.1", host: "…"
+#
+# Timestamp is optional and format-tolerant (YYYY/MM/DD or YYYY-MM-DD, optional
+# fractional seconds / timezone). Matching starts at [level] so mixed samples
+# from different hosts still parse.
+#
+# amtail notes:
+#   - Avoid nested " inside /regex/ (lexer breaks on "[^"]*").
+#   - A /pattern/ that is a bare identifier (no spaces/metacharacters) is NOT
+#     compiled as a regexp — use a space or metacharacters, e.g. /failed /
+#     or /open.. .* failed /.
+#
+# Labels:
+#   level  — nginx severity (lua continuation lines use level=error)
+#   kind   — coarse error class (stable; no URLs / client IPs)
+#   server — vhost from ", server: …" or "-" when absent
+#   action — enable|disable|timeout|protocol for upstream check module
+#   zone   — limit_req / delay zone name when present
+#
+# Lua / OpenResty stacktraces span multiple lines without the usual
+# "[level] pid#tid:" prefix. Count the header once (lua_traceback) and
+# each frame as lua_frame; the originating nginx line is kind=lua.
+
+counter nginx_error_total by level, kind, server
+counter nginx_error_check_peer_total by action
+counter nginx_error_limit_total by kind, zone, server
+
+hidden text server
+hidden text kind
+hidden text zone
+hidden text action
+hidden text level
+
+# --- Lua stacktrace continuations (no nginx timestamp / [level] prefix) ---
+/stack traceback:/ {
+  level = "error"
+  kind = "lua_traceback"
+  server = "-"
+  nginx_error_total[$level][$kind][$server]++
+}
+
+/coroutine \d+:/ {
+  level = "error"
+  kind = "lua_frame"
+  server = "-"
+  nginx_error_total[$level][$kind][$server]++
+}
+
+/in function/ {
+  level = "error"
+  kind = "lua_frame"
+  server = "-"
+  nginx_error_total[$level][$kind][$server]++
+}
+
+/in main chunk/ {
+  level = "error"
+  kind = "lua_frame"
+  server = "-"
+  nginx_error_total[$level][$kind][$server]++
+}
+
+/tail calls/ {
+  level = "error"
+  kind = "lua_frame"
+  server = "-"
+  nginx_error_total[$level][$kind][$server]++
+}
+
+# Optional timestamp, then [level] pid#tid: [*connection]
+/(?:\d{4}[\/\-]\d{2}[\/\-]\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+)?\[(?P<level>debug|info|notice|warn|error|crit|alert|emerg)\]\s+\d+#\d+:\s+(?:\*\d+\s+)?/ {
+  kind = "other"
+  server = "-"
+  zone = "-"
+  action = "-"
+
+  # trailing comma OR end-of-line (SSL listen sockets often have no further fields)
+  /, server: (?P<srv>[^\s,][^,]*)(?:,|$)/ {
+    server = $srv
+  }
+
+  # --- Lua / OpenResty (on the nginx-formatted error line) ---
+  /lua .* aborted/ {
+    kind = "lua"
+  }
+  /runtime error:/ {
+    kind = "lua"
+  }
+  /content_by_lua/ {
+    kind = "lua"
+  }
+  /access_by_lua/ {
+    kind = "lua"
+  }
+  /rewrite_by_lua/ {
+    kind = "lua"
+  }
+  /header_filter_by_lua/ {
+    kind = "lua"
+  }
+  /body_filter_by_lua/ {
+    kind = "lua"
+  }
+  /log_by_lua/ {
+    kind = "lua"
+  }
+  /init_by_lua/ {
+    kind = "lua"
+  }
+  /init_worker_by_lua/ {
+    kind = "lua"
+  }
+  /balancer_by_lua/ {
+    kind = "lua"
+  }
+  /ssl_certificate_by_lua/ {
+    kind = "lua"
+  }
+  /\.lua:\d+/ {
+    kind = "lua"
+  }
+  /stack traceback:/ {
+    kind = "lua_traceback"
+  }
+
+  # --- upstream healthcheck (nginx_upstream_check_module) ---
+  /disable check peer:/ {
+    kind = "check_peer"
+    action = "disable"
+    nginx_error_check_peer_total[$action]++
+  }
+  /enable check peer:/ {
+    kind = "check_peer"
+    action = "enable"
+    nginx_error_check_peer_total[$action]++
+  }
+  /check time out with peer:/ {
+    kind = "check_peer"
+    action = "timeout"
+    nginx_error_check_peer_total[$action]++
+  }
+  /check protocol .* with peer:/ {
+    kind = "check_peer"
+    action = "protocol"
+    nginx_error_check_peer_total[$action]++
+  }
+
+  # --- access / rate limit ---
+  /access forbidden by rule/ {
+    kind = "access_forbidden"
+  }
+  /limiting requests/ {
+    kind = "limiting_requests"
+    /by zone .(?P<z>[A-Za-z0-9_.-]+)./ {
+      zone = $z
+    }
+    nginx_error_limit_total[$kind][$zone][$server]++
+  }
+  /delaying request/ {
+    kind = "delaying_request"
+    /by zone .(?P<z>[A-Za-z0-9_.-]+)./ {
+      zone = $z
+    }
+    nginx_error_limit_total[$kind][$zone][$server]++
+  }
+
+  # --- client / static ---
+  /a client request body is buffered to a temporary file/ {
+    kind = "client_body_buffered"
+  }
+  /an upstream response is buffered to a temporary file/ {
+    kind = "upstream_body_buffered"
+  }
+  /is not found/ {
+    kind = "not_found"
+  }
+  /open.. .* failed / {
+    kind = "not_found"
+  }
+  /client sent (?:too short|invalid) userid cookie/ {
+    kind = "userid_cookie"
+  }
+  /ModSecurity: Access denied/ {
+    kind = "modsecurity"
+  }
+
+  # --- upstream / socket ---
+  /upstream timed out/ {
+    kind = "upstream_timed_out"
+  }
+  /upstream prematurely closed connection/ {
+    kind = "upstream_prematurely_closed"
+  }
+  /upstream server temporarily disabled/ {
+    kind = "upstream_temporarily_disabled"
+  }
+  /upstream sent / {
+    kind = "upstream_sent"
+  }
+  /no live upstreams/ {
+    kind = "no_live_upstreams"
+  }
+  /host not found in upstream/ {
+    kind = "upstream_host_not_found"
+  }
+  /connect.. failed/ {
+    kind = "connect_failed"
+  }
+  /recv.. failed/ {
+    kind = "recv_failed"
+  }
+  /send.. failed/ {
+    kind = "send_failed"
+  }
+  /bind[(].*[)] failed/ {
+    kind = "bind_failed"
+  }
+
+  # --- SSL / certs ---
+  /SSL_do_handshake../ {
+    kind = "ssl"
+  }
+  /SSL_read../ {
+    kind = "ssl"
+  }
+  /SSL_write../ {
+    kind = "ssl"
+  }
+  /cannot load certificate/ {
+    kind = "ssl"
+  }
+  /BIO_new_file/ {
+    kind = "ssl"
+  }
+  /while SSL handshaking,/ {
+    kind = "ssl"
+  }
+  /ngx_ssl_ja4:/ {
+    kind = "ssl_ja4"
+  }
+
+  # --- DNS / resolver ---
+  /could not be resolved/ {
+    kind = "dns_resolve"
+  }
+  /unexpected DNS response/ {
+    kind = "dns_unexpected"
+  }
+
+  # --- cache / files ---
+  /cache file .* has too long header/ {
+    kind = "cache_header"
+  }
+  /rename.. / {
+    kind = "rename_failed"
+  }
+  /dlopen../ {
+    kind = "dlopen"
+  }
+
+  # --- config / variables ---
+  /using uninitialized / {
+    kind = "uninitialized_variable"
+  }
+  /unknown .* variable/ {
+    kind = "unknown_variable"
+  }
+
+  # --- process lifecycle (usually notice) ---
+  /(?:reopening logs|reconfiguring|start worker|start cache|gracefully shutting|exiting|clear all the events|worker process .* exited|cache manager process .* exited|signal \d+|using the |using binary geo|ModSecurity-nginx |libmodsecurity)/ {
+    kind = "lifecycle"
+  }
+  /: exit$/ {
+    kind = "lifecycle"
+  }
+
+  nginx_error_total[$level][$kind][$server]++
+}
