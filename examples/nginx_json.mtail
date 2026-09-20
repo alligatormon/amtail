@@ -1,0 +1,54 @@
+# Nginx JSON access log → per-peer upstream metrics via split/zip.
+#
+# Separators (ngx_http_upstream_module):
+#   ", "  — peers in the same upstream group (proxy_next_upstream / retries)
+#   " : " — jump to another upstream group (error_page / X-Accel) → fallback
+#
+# Sample:
+#   "upstream_addr":"10.99.1.253:80, 10.99.1.239:80 : 81.19.82.12:443"
+
+counter http_requests_total by status, cache_status, http_host, method
+counter http_bytes_sent_total by status, cache_status, http_host, method
+histogram http_request_time by http_host, method buckets 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
+
+counter http_upstream_requests_total by upstream, status, http_host
+histogram http_upstream_response_time by upstream, http_host buckets 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
+
+counter http_upstream_retries_total by http_host, method
+counter http_upstream_fallback_total by http_host, method
+
+hidden counter bs
+hidden counter i
+hidden text ua
+hidden text us
+hidden text urt
+
+/\{"timestamp":\s*"[^"]*","hostname":\s*"[^"]*","remote_addr":\s*"[^"]*","remote_user":\s*"[^"]*","bytes_sent":\s*(?P<bytes_sent>\d+),"request_time":\s*(?P<request_time>[0-9.]+),"request_id":\s*"[^"]*","request_id_any":\s*"[^"]*","status":\s*(?P<status>\d+),"http_host":\s*"(?P<http_host>[^"]*)","server_name":\s*"[^"]*","request":\s*"[^"]*","request_method":\s*"(?P<method>[^"]*)","http_referrer":\s*"[^"]*","http_user_agent":\s*"[^"]*","scheme":\s*"[^"]*","upstream_addr":\s*"(?P<upstream_addr>[^"]*)","upstream_status":\s*"(?P<upstream_status>[^"]*)","upstream_response_time":\s*"(?P<upstream_response_time>[^"]*)","uniq":\s*"[^"]*","cache_status":\s*"(?P<cache_status>[^"]*)"/ {
+  http_requests_total[$status][$cache_status][$http_host][$method]++
+  bs = int($bytes_sent)
+  http_bytes_sent_total[$status][$cache_status][$http_host][$method] += bs
+  http_request_time[$http_host][$method] = $request_time
+
+  $addr_groups = split(" : ", $upstream_addr)
+  $addr_groups > 1 {
+    http_upstream_fallback_total[$http_host][$method]++
+  }
+
+  ua = subst(" : ", ", ", $upstream_addr)
+  us = subst(" : ", ", ", $upstream_status)
+  urt = subst(" : ", ", ", $upstream_response_time)
+
+  $addrs = split(",", ua)
+  $ustatuses = split(",", us)
+  $urts = split(",", urt)
+
+  i = 0
+  zip($addrs, $ustatuses, $urts) as ($upstream, $ustatus, $urtv) {
+    http_upstream_requests_total[$upstream][$ustatus][$http_host]++
+    http_upstream_response_time[$upstream][$http_host] = $urtv
+    i > 0 {
+      http_upstream_retries_total[$http_host][$method]++
+    }
+    i++
+  }
+}
