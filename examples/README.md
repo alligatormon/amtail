@@ -27,6 +27,19 @@ Related: `range($arr) as $x { }` walks a single split array.
 |------|----------------|
 | [`zip_basic.mtail`](zip_basic.mtail) | Parallel upstream fields → per-peer metrics |
 | [`nginx_json.mtail`](nginx_json.mtail) | Nginx JSON access log: `","` retries, `" : "` fallback, histograms |
-| [`nginx_error.mtail`](nginx_error.mtail) | Nginx `error_log`: severity + kind (+ server/zone/check-peer) |
+| [`nginx_error.mtail`](nginx_error.mtail) | Nginx `error_log`: severity + kind (+ server/zone/check-peer/lua) |
+| [`nginx_error.log`](nginx_error.log) | Anonymized sample error_log for local testing |
+| [`anonymize_nginx_error_log.py`](anonymize_nginx_error_log.py) | Redact IPs/hosts/cookies from a real dump → `nginx_error.log` |
+
+### Local test (nginx error_log)
+
+```bash
+# from amtail/
+./build/amtail --run examples/nginx_error.mtail examples/nginx_error.log
+
+# or anonymize a fresh dump:
+python3 examples/anonymize_nginx_error_log.py /path/to/error_log examples/nginx_error.log
+```
+
 
 Automated tests live under `tests/zip_*.mtail`.

@@ -1,0 +1,651 @@
+2026/09/20 00:00:00 [warn] 179003#179003: *3060044769 a client request body is buffered to a temporary file /spool/nginx/client/0384898751, client: 10.241.3.99, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:00:01 [error] 179001#179001: disable check peer: 10.137.213.164:80
+2026/09/20 00:00:02 [error] 179003#179003: enable check peer: 10.137.213.164:80
+2026/09/20 00:00:03 [error] 179007#179007: disable check peer: 10.163.165.103:8081
+2026/09/20 00:00:04 [error] 179007#179007: disable check peer: 10.238.48.224:8081
+2026/09/20 00:00:05 [error] 179005#179005: enable check peer: 10.163.165.103:8081
+2026/09/20 00:00:06 [error] 179003#179003: enable check peer: 10.238.48.224:8081
+2026/09/20 00:00:07 [error] 179008#179008: *3060271954 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.8, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:00:08 [error] 179001#179001: *3060237507 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.8, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:00:09 [error] 179006#179006: *3060108848 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.8, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:00:10 [error] 179008#179008: *3060271954 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.8, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:00:11 [error] 179008#179008: *3060271954 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.8, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:00:12 [error] 179008#179008: *3060271954 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.8, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:00:13 [error] 179008#179008: *3060271954 open() "/var/nginx/anon/7142a8f675_lander" failed (2: No such file or directory), client: 198.51.100.8, server: ap.example.com, request: "GET /lander HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:00:14 [error] 179008#179008: *3060271954 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.8, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:00:15 [error] 179008#179008: *3060271954 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.8, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:00:16 [error] 179006#179006: disable check peer: 10.163.165.103:8081
+2026/09/20 00:00:17 [error] 179005#179005: enable check peer: 10.163.165.103:8081
+2026/09/20 00:00:18 [error] 179007#179007: disable check peer: 10.62.229.216:8081
+2026/09/20 00:00:19 [error] 179003#179003: enable check peer: 10.62.229.216:8081
+2026/09/20 00:00:20 [error] 179001#179001: *3060760152 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:21 [error] 3144081#3144081: *14160691799 limiting requests, excess: 15.245 by zone "portal_main", client: 203.0.113.208, server: www.news.example, request: "GET / HTTP/1.1", host: "www.news.example"
+2026/09/20 00:00:22 [crit] 3144100#3144100: *14160722536 SSL_do_handshake() failed (SSL: error:0A0000C6:SSL routines::packet length too long error:0A000139:SSL routines::record layer failure) while SSL handshaking, client: 198.51.100.84, server: 10.98.85.227:443
+2026/09/20 00:00:23 [crit] 3144109#3144109: *14143143228 SSL_read() failed (SSL: error:0A0000C6:SSL routines::packet length too long error:0A000139:SSL routines::record layer failure) while waiting for request, client: 198.51.100.84, server: 10.98.85.227:443
+2026/09/20 00:00:24 [error] 179001#179001: *3060760152 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:25 [error] 179003#179003: *3060711069 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:26 [error] 179003#179003: *3060711069 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:27 [error] 179002#179002: *3060671614 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:28 [error] 179002#179002: *3060671614 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:29 [error] 179002#179002: *3060671614 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:30 [error] 179002#179002: *3060671614 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:31 [error] 179003#179003: *3060711069 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:32 [error] 179003#179003: *3060711069 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:33 [error] 179003#179003: *3060711069 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:34 [error] 179003#179003: *3060711069 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:35 [error] 179003#179003: *3060711069 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:36 [error] 179003#179003: *3060711069 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:37 [error] 179003#179003: *3060711069 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:38 [error] 179003#179003: *3060711069 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:39 [error] 179002#179002: *3060671614 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:40 [error] 179002#179002: *3060671614 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:00:41 [error] 179005#179005: *3060785885 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 192.0.2.163, server: tv.example.com, request: "GET /b8610bb1-f96b-4f3c-b015-7ce8a9db5eaa/ HTTP/1.1", upstream: "http://10.133.12.28:80/b8610bb1-f96b-4f3c-b015-7ce8a9db5eaa/", host: "tv.example.com"
+2026/09/20 00:00:42 [error] 179005#179005: recv() failed (104: Connection reset by peer)
+2026/09/20 00:00:43 [warn] 179001#179001: *3061015609 a client request body is buffered to a temporary file /spool/nginx/client/0384941341, client: 10.209.213.51, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:00:44 [warn] 179001#179001: *3061062360 a client request body is buffered to a temporary file /spool/nginx/client/0384943681, client: 10.218.41.141, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:00:45 [error] 179003#179003: *3061145705 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:00:46 [error] 179003#179003: *3061145705 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:00:47 [error] 179006#179006: *3061191186 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:00:48 [error] 179006#179006: *3061191186 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:00:49 [error] 179001#179001: *3061150399 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 203.0.113.218, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:00:50 [error] 179004#179004: *3061403494 client sent too short userid cookie "REDACTED", client: 192.0.2.89, server: static.example.com, request: "GET /fonts/Manrope/Manrope.css HTTP/1.1", host: "static.example.com", referrer: "https://www.example.test/video/f65cf11642010fdc462662a392ed4058/"
+2026/09/20 00:00:51 [error] 179003#179003: disable check peer: 10.238.48.224:8081
+2026/09/20 00:00:52 [error] 179006#179006: disable check peer: 10.62.229.216:8081
+2026/09/20 00:00:53 [error] 179003#179003: enable check peer: 10.238.48.224:8081
+2026/09/20 00:00:54 [error] 179006#179006: enable check peer: 10.62.229.216:8081
+2026/09/20 00:00:55 [error] 179006#179006: disable check peer: 10.62.229.216:8081
+2026/09/20 00:00:56 [error] 179001#179001: disable check peer: 10.238.48.224:8081
+2026/09/20 00:00:57 [error] 179003#179003: enable check peer: 10.62.229.216:8081
+2026/09/20 00:00:58 [error] 179007#179007: enable check peer: 10.238.48.224:8081
+2026/09/20 00:00:59 [error] 179004#179004: recv() failed (104: Connection reset by peer)
+2026/09/20 00:01:00 [error] 179005#179005: disable check peer: 10.137.213.164:80
+2026/09/20 00:01:01 [error] 179004#179004: disable check peer: 10.137.213.164:80
+2026/09/20 00:01:02 [error] 179006#179006: disable check peer: 10.137.213.164:80
+2026/09/20 00:01:03 [error] 179005#179005: enable check peer: 10.137.213.164:80
+2026/09/20 00:01:04 [error] 179005#179005: enable check peer: 10.137.213.164:80
+2026/09/20 00:01:05 [error] 179002#179002: enable check peer: 10.137.213.164:80
+2026/09/20 00:01:06 [error] 179005#179005: disable check peer: 10.216.188.161:80
+2026/09/20 00:01:07 [error] 179008#179008: disable check peer: 10.216.188.161:80
+2026/09/20 00:01:08 [error] 179006#179006: disable check peer: 10.216.188.161:80
+2026/09/20 00:01:09 [error] 179007#179007: enable check peer: 10.216.188.161:80
+2026/09/20 00:01:10 [error] 179003#179003: enable check peer: 10.216.188.161:80
+2026/09/20 00:01:11 [error] 179007#179007: enable check peer: 10.216.188.161:80
+2026/09/20 00:01:12 [error] 179003#179003: disable check peer: 10.163.165.103:8081
+2026/09/20 00:01:13 [error] 179004#179004: enable check peer: 10.163.165.103:8081
+2026/09/20 00:01:14 [error] 179003#179003: *3062641410 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:01:15 [error] 179003#179003: *3062641410 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:01:16 [error] 179008#179008: *3062624753 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:01:17 [error] 179008#179008: *3062624753 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:01:18 [error] 179008#179008: *3062570491 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 203.0.113.218, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:01:19 [error] 179003#179003: disable check peer: 10.238.48.224:8081
+2026/09/20 00:01:20 [error] 179003#179003: enable check peer: 10.238.48.224:8081
+2026/09/20 00:01:21 [error] 179005#179005: recv() failed (104: Connection reset by peer)
+2026/09/20 00:01:22 [error] 179005#179005: disable check peer: 10.210.110.76:80
+2026/09/20 00:01:23 [error] 179005#179005: disable check peer: 10.210.110.76:80
+2026/09/20 00:01:24 [error] 179005#179005: disable check peer: 10.210.110.76:80
+2026/09/20 00:01:25 [error] 179008#179008: enable check peer: 10.210.110.76:80
+2026/09/20 00:01:26 [error] 179001#179001: enable check peer: 10.210.110.76:80
+2026/09/20 00:01:27 [error] 179008#179008: enable check peer: 10.210.110.76:80
+2026/09/20 00:01:28 [error] 179006#179006: *3064052031 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:01:29 [error] 179006#179006: *3064052031 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:01:30 [error] 179006#179006: *3064094016 client sent too short userid cookie "REDACTED", client: 203.0.113.77, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/2707"
+2026/09/20 00:01:31 [error] 179001#179001: *3064690389 upstream prematurely closed connection while reading upstream, client: 203.0.113.184, server: embeds.example.com, request: "POST /ner/v1/chats HTTP/1.1", upstream: "http://10.212.156.164:80/v1/chats", host: "embeds.example.com", referrer: "https://www.example.test/"
+2026/09/20 00:01:32 [error] 179002#179002: *3065064547 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:33 [error] 179003#179003: *3065030711 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:34 [error] 179003#179003: *3065030711 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:35 [error] 179002#179002: *3065064547 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:36 [error] 179002#179002: *3065064547 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:37 [error] 179002#179002: *3065064547 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:38 [error] 179002#179002: *3065064547 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:39 [error] 179002#179002: *3065064547 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:40 [error] 179003#179003: *3065030711 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:41 [error] 179003#179003: *3065030711 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:42 [error] 179003#179003: *3065030711 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:43 [error] 179003#179003: *3065030711 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:44 [error] 179003#179003: *3065030711 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:45 [error] 179003#179003: *3065030711 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:46 [error] 179002#179002: *3065064547 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:47 [error] 179002#179002: *3065064547 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:48 [error] 179002#179002: *3065064547 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:49 [error] 179002#179002: *3065064547 access forbidden by rule, client: 192.0.2.27, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:01:50 [error] 179008#179008: *3065437782 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:01:51 [error] 179008#179008: *3065437782 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:01:52 [error] 179004#179004: *3065370007 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:01:53 [error] 179004#179004: *3065370007 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:01:54 [error] 179002#179002: *3065311468 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 203.0.113.218, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:01:55 [error] 179003#179003: *3066103758 upstream timed out (110: Connection timed out) while SSL handshaking to upstream, client: 10.159.135.222, server: cf-portal.example.net, request: "GET /srv1.example.org/nginx.conf HTTP/1.1", upstream: "http://10.151.76.191:443/srv1.example.org/nginx.conf", host: "cf-portal.example.net"
+2026/09/20 00:01:56 [error] 179002#179002: disable check peer: 10.238.48.224:8081
+2026/09/20 00:01:57 [error] 179001#179001: enable check peer: 10.238.48.224:8081
+2026/09/20 00:01:58 [error] 179002#179002: *3066426256 upstream prematurely closed connection while reading response header from upstream, client: 192.0.2.204, server: embeds.example.com, request: "GET /finance/?start=1789262941&end=1789867741 HTTP/1.1", upstream: "http://10.79.23.145:80/v1/sources/?start=1789262941&end=1789867741", host: "embeds.example.com", referrer: "https://rag.example.com/?ysclid=mu951cllbb75336047"
+2026/09/20 00:01:59 [error] 179005#179005: disable check peer: 10.163.165.103:8081
+2026/09/20 00:02:00 [error] 179003#179003: enable check peer: 10.163.165.103:8081
+2026/09/20 00:02:01 [error] 179004#179004: recv() failed (104: Connection reset by peer)
+2026/09/20 00:02:02 [error] 179006#179006: *3066852015 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:02:03 [error] 179006#179006: *3066852015 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:02:04 [error] 179006#179006: *3066852015 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:02:05 [error] 179006#179006: *3066852015 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:02:06 [error] 179003#179003: *3066766709 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 203.0.113.218, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:07 [error] 179006#179006: recv() failed (104: Connection reset by peer)
+2026/09/20 00:02:08 [error] 179005#179005: *3066920503 open() "/var/nginx/anon/c33943c7d2_robots.txt" failed (2: No such file or directory), client: 192.0.2.184, server: ap.example.com, request: "GET /robots.txt HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:09 [error] 179008#179008: recv() failed (104: Connection reset by peer)
+2026/09/20 00:02:10 [error] 179005#179005: *3067346662 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:11 [error] 179001#179001: *3067333158 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:12 [error] 179001#179001: *3067333158 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:13 [error] 179001#179001: *3067333158 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:14 [error] 179001#179001: *3067333158 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:15 [error] 179001#179001: *3067333158 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:16 [error] 179005#179005: *3067346662 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:17 [error] 179005#179005: *3067346662 open() "/var/nginx/anon/7142a8f675_lander" failed (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET /lander HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:18 [error] 179005#179005: *3067346662 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:19 [error] 179007#179007: disable check peer: 10.240.40.110:80
+2026/09/20 00:02:20 [error] 179005#179005: disable check peer: 10.240.40.110:80
+2026/09/20 00:02:21 [error] 179008#179008: disable check peer: 10.240.40.110:80
+2026/09/20 00:02:22 [error] 179003#179003: enable check peer: 10.240.40.110:80
+2026/09/20 00:02:23 [error] 179005#179005: enable check peer: 10.240.40.110:80
+2026/09/20 00:02:24 [error] 179008#179008: enable check peer: 10.240.40.110:80
+2026/09/20 00:02:25 [error] 179003#179003: *3068024193 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 192.0.2.129, server: embeds.example.com, request: "GET /finance/?start=1789267104&end=1789871904 HTTP/1.1", upstream: "http://10.81.129.19:80/v1/sources/?start=1789267104&end=1789871904", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:02:26 [error] 179001#179001: *3068331407 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 192.0.2.107, server: embeds.example.com, request: "GET /finance/?start=1788662941&end=1789872541 HTTP/1.1", upstream: "http://10.81.129.19:80/v1/sources/?start=1788662941&end=1789872541", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:02:27 [error] 179006#179006: *3068100319 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:02:28 [error] 179006#179006: *3068100319 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:02:29 [error] 179001#179001: *3068265135 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:02:30 [error] 179001#179001: *3068265135 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:02:31 [error] 179002#179002: *3068199767 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 203.0.113.218, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:02:32 [error] 179005#179005: recv() failed (104: Connection reset by peer)
+2026/09/20 00:02:33 [error] 179008#179008: *3068564801 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:34 [error] 179008#179008: *3068564801 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:35 [error] 179007#179007: *3068569645 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:36 [error] 179007#179007: *3068569645 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:37 [error] 179007#179007: *3068569645 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:38 [error] 179007#179007: *3068569645 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:39 [error] 179008#179008: *3068564801 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:40 [error] 179008#179008: *3068564801 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:41 [error] 179008#179008: *3068564801 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:42 [error] 179008#179008: *3068564801 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:43 [error] 179007#179007: *3068569645 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:44 [error] 179007#179007: *3068569645 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:45 [error] 179008#179008: *3068564801 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:46 [error] 179008#179008: *3068564801 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:47 [error] 179008#179008: *3068564801 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:48 [error] 179008#179008: *3068564801 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:49 [error] 179008#179008: *3068559553 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:50 [error] 179008#179008: *3068559553 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:51 [error] 179003#179003: *3068935562 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 192.0.2.221, server: embeds.example.com, request: "GET /finance/?start=1789269247&end=1789874047 HTTP/1.1", upstream: "http://10.87.58.74:80/v1/sources/?start=1789269247&end=1789874047", host: "embeds.example.com", referrer: "https://rag.example.com/"
+2026/09/20 00:02:52 [error] 179002#179002: *3068957295 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 192.0.2.145, server: embeds.example.com, request: "GET /finance/?start=1789269368&end=1789874168 HTTP/1.1", upstream: "http://10.66.171.58:80/v1/sources/?start=1789269368&end=1789874168", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:02:53 [error] 179003#179003: *3068877197 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:54 [error] 179003#179003: *3068877197 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:55 [error] 179008#179008: *3069251140 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:56 [error] 179008#179008: *3069251140 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:57 [error] 179008#179008: *3069251140 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:58 [error] 179008#179008: *3069251140 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:02:59 [error] 179008#179008: *3069251140 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:00 [error] 179008#179008: *3069251140 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:01 [error] 179008#179008: *3069251140 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:02 [error] 179008#179008: *3069251140 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:03 [error] 179003#179003: *3068877197 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:04 [error] 179003#179003: *3068877197 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:05 [error] 179003#179003: *3068877197 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:06 [error] 179003#179003: *3068877197 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:07 [error] 179008#179008: *3069251140 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:08 [error] 179008#179008: *3069251140 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:09 [error] 179003#179003: *3068877197 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:10 [error] 179003#179003: *3068877197 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:11 [error] 179005#179005: disable check peer: 10.137.213.164:80
+2026/09/20 00:03:12 [error] 179004#179004: enable check peer: 10.137.213.164:80
+2026/09/20 00:03:13 [error] 179005#179005: *3069291717 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 192.0.2.155, server: class.example.com, request: "GET / HTTP/1.1", upstream: "http://10.212.156.164:80/", host: "class.example.com", referrer: "https://host-79e20b.example.test/"
+2026/09/20 00:03:14 [error] 179002#179002: *3069706393 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:03:15 [error] 179002#179002: *3069706393 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:03:16 [error] 179003#179003: *3069742294 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:03:17 [error] 179003#179003: *3069742294 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:03:18 [error] 179005#179005: *3069733268 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 203.0.113.218, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:03:19 [error] 179002#179002: *3069764154 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:20 [error] 179002#179002: *3069764154 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:21 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:22 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:23 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:24 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:25 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:26 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:27 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:28 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:29 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:30 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:31 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:32 [error] 179001#179001: *3069850216 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:33 [error] 179002#179002: *3069764154 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:34 [error] 179002#179002: *3069764154 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:35 [error] 179002#179002: *3069764154 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:36 [error] 179002#179002: *3069764154 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:37 [error] 179002#179002: *3070325594 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:38 [error] 179002#179002: *3070325594 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:39 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:40 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:41 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:42 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:43 [error] 179003#179003: recv() failed (104: Connection reset by peer)
+2026/09/20 00:03:44 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:45 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:46 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:47 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:48 [error] 179002#179002: *3070325594 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:49 [error] 179002#179002: *3070325594 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:50 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:51 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:52 [error] 179006#179006: *3070359543 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:53 [error] 179006#179006: *3070359543 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:54 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:55 [error] 179006#179006: *3070266419 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:03:56 [error] 179004#179004: disable check peer: 10.238.48.224:8081
+2026/09/20 00:03:57 [error] 179005#179005: enable check peer: 10.238.48.224:8081
+2026/09/20 00:03:58 [error] 179008#179008: *3070536973 client sent too short userid cookie "REDACTED", client: 192.0.2.91, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/"
+2026/09/20 00:03:59 [error] 179001#179001: disable check peer: 10.163.165.103:8081
+2026/09/20 00:04:00 [error] 179002#179002: enable check peer: 10.163.165.103:8081
+2026/09/20 00:04:01 [error] 179008#179008: *3070998393 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:04:02 [error] 179008#179008: *3070832283 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:04:03 [error] 179003#179003: *3070990139 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:04:04 [error] 179006#179006: *3070687260 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:04:05 [error] 179006#179006: *3070687260 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:04:06 [error] 179008#179008: *3070832283 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:04:07 [error] 179008#179008: *3070832283 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:04:08 [error] 179008#179008: *3070832283 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:04:09 [error] 179008#179008: *3070832283 open() "/var/nginx/anon/7142a8f675_lander" failed (2: No such file or directory), client: 198.51.100.123, server: ap.example.com, request: "GET /lander HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:04:10 [error] 179001#179001: disable check peer: 10.137.213.164:80
+2026/09/20 00:04:11 [error] 179003#179003: disable check peer: 10.137.213.164:80
+2026/09/20 00:04:12 [error] 179007#179007: disable check peer: 10.137.213.164:80
+2026/09/20 00:04:13 [error] 179005#179005: enable check peer: 10.137.213.164:80
+2026/09/20 00:04:14 [error] 179002#179002: enable check peer: 10.137.213.164:80
+2026/09/20 00:04:15 [error] 179002#179002: enable check peer: 10.137.213.164:80
+2026/09/20 00:04:16 [error] 179001#179001: recv() failed (104: Connection reset by peer)
+2026/09/20 00:04:17 [warn] 179006#179006: *3071658311 a client request body is buffered to a temporary file /spool/nginx/client/0385453021, client: 10.241.3.99, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:04:18 [error] 179004#179004: disable check peer: 10.163.165.103:8081
+2026/09/20 00:04:19 [error] 179006#179006: enable check peer: 10.163.165.103:8081
+2026/09/20 00:04:20 [error] 179007#179007: *3071714281 upstream prematurely closed connection while reading response header from upstream, client: 203.0.113.18, server: embeds.example.com, request: "GET /finance/?start=1789276086&end=1789880886 HTTP/1.1", upstream: "http://10.52.165.21:80/v1/sources/?start=1789276086&end=1789880886", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:04:21 [crit] 3144103#3144103: *14125245871 SSL_write() failed while processing HTTP/2 connection, client: 192.0.2.200, server: 10.98.85.227:443
+2026/09/20 00:04:22 [error] 179004#179004: disable check peer: 10.238.48.224:8081
+2026/09/20 00:04:23 [error] 179008#179008: enable check peer: 10.238.48.224:8081
+2026/09/20 00:04:24 [warn] 179001#179001: *3071928188 a client request body is buffered to a temporary file /spool/nginx/client/0385467728, client: 10.209.213.51, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:04:25 [crit] 3144081#3144081: *14125867264 cache file "/var/nginx/anon/4d89fe5f10_b5b141faf3c08ffc5ff28ab8f56c0e43" has too long header, client: 198.51.100.90, server: api.news.example, request: "GET /v4-alfa/topic/by_url?url=%2Farticles%2F2026%2F09%2F19%2Fweapon%2F HTTP/2.0", host: "api.rag.example", referrer: "https://www.rag.example/p/n/"
+2026/09/20 00:04:26 [emerg] 38718#38718: cannot load certificate "/var/nginx/anon/e7d163d5b7-www.example.crt": BIO_new_file() failed (SSL: error:80000002:system library::No such file or directory:calling fopen(/etc/nginx/ssl/anon.crt r) error:10000080:BIO routines::no such file)
+2026/09/20 00:04:27 [emerg] 469163#469163: host not found in upstream "2vm0014-prod-s.example.org:9000" in /etc/nginx/nginx.conf:512
+2026/09/20 00:04:28 [emerg] 561762#561762: host not found in upstream "1vm0015-prod-s.example.org:9000" in /etc/nginx/nginx.conf:511
+2026/09/20 00:04:29 [emerg] 778818#778818: host not found in upstream "0vm0006-prod-s.example.org:9001" in /etc/nginx/nginx.conf:474
+2026/09/20 00:04:30 [emerg] 15432#15432: unknown "en_upstream" variable
+2026/09/20 00:04:31 [warn] 3960780#3960780: *609107504 SSL_client_hello_get_ja_data seems the buffer size is less that number of fileds; for this SSL connection can't get a ja3 hash string while SSL handshaking, client: 203.0.113.187, server: 203.0.113.187:443
+2026/09/20 00:04:32 [warn] 3960780#3960780: *609107505 SSL_client_hello_get_ja_data seems the buffer size is less that number of fileds; for this SSL connection can't get a ja3 hash string while SSL handshaking, client: 203.0.113.61, server: 203.0.113.187:443
+2026/09/20 00:04:33 [warn] 3960782#3960782: *609103060 ngx_ssl_ja4: fp_ja_data == NULL, client: 192.0.2.125, server: www.blog.example, request: "GET /manage/comments/filter/ HTTP/1.0", host: "www.blog.example", referrer: "https://www.blog.example/manage/comments/filter/"
+2026/09/20 00:04:34 [warn] 3960781#3960781: *609103502 ngx_ssl_ja4: fp_ja_data == NULL while logging request, client: 198.51.100.23, server: www.blog.example, request: "GET /manage/comments/filter/ HTTP/1.0", upstream: "http://10.104.217.239:80/manage/comments/filter/", host: "www.blog.example", referrer: "https://www.blog.example/manage/comments/filter/"
+2026/09/20 00:04:35 [error] 3960782#3960782: *609251129 i43.example.test could not be resolved (3: Host not found), client: 203.0.113.235, server: imgprx.cdn.example, request: "GET /b23443f7847f4aff21e741f3871e6818f7888d13a6cd9f686ce54ee8f0158625/P2WlxyVijxKvi25n9cxUUEMdsf-ah7h01hrRCaZagcnD-huals6oRxgzElUmDhw_sUtT3iA:tUTvgLK9cjugH1OlzqUGkw HTTP/1.1", host: "imgprx.cdn.example"
+2026/09/20 12:00:00 [error] 1001#1001: *900001 lua entry thread aborted: runtime error: /var/nginx/anon/handler.lua:42: attempt to index a nil value
+stack traceback:
+coroutine 0:
+	/var/nginx/anon/handler.lua:42: in function 'handle'
+	/var/nginx/anon/handler.lua:10: in function </var/nginx/anon/handler.lua:5>
+	[C]: in function 'xpcall'
+	content_by_lua(nginx.conf:88):2: in main chunk
+	(...tail calls...)
+2026/09/20 00:04:36 [warn] 3960780#3960780: *611163338 an upstream response is buffered to a temporary file /spool/nginx/proxy/0003677250 while reading upstream, client: 198.51.100.194, server: www.blog.example, request: "GET /2664831.html HTTP/1.1", upstream: "http://10.28.99.22:80/2664831.html", host: "blog.example"
+2026/09/20 00:04:37 [warn] 3960783#3960783: *611159547 an upstream response is buffered to a temporary file /spool/nginx/proxy/0003677251 while reading upstream, client: 192.0.2.186, server: i-pics.blog.example, request: "GET /dedeotaku/84835608/10329/10329_original.gif HTTP/1.1", upstream: "http://10.76.237.35:80/dedeotaku/84835608/10329/10329_original.gif", host: "i-pics.blog.example"
+2026/09/20 00:04:38 [error] 3960781#3960781: *612145583 upstream sent invalid response: "550 5.7.0 Error: insufficient authorization" while reading response from upstream, client: 203.0.113.150, server: 192.0.2.72:25, upstream: 10.57.109.54:25
+2026/09/20 00:04:39 [error] 3960783#3960783: *612148789 upstream sent invalid response: "550 5.7.0 Error: insufficient authorization" while reading response from upstream, client: 192.0.2.208, server: 192.0.2.72:25, upstream: 10.185.107.110:25
+2026/09/20 00:04:40 [crit] 3960780#3960780: *612188506 bind(203.0.113.50) failed (22: Invalid argument) while connecting to upstream, client: 203.0.113.27, server: www.blog.example, request: "GET /%7B%7B%20' HTTP/1.1", upstream: "http://[2001:db8:11bf:440b::0aa2]:443/%7B%7B%20'", host: "blog.example", referrer: "https://blog.example/2313540.html?view=comments"
+2026/09/20 00:04:41 [warn] 3960781#3960781: *610076839 upstream server temporarily disabled while reading response header from upstream, client: 192.0.2.226, server: imgprx.cdn.example, request: "GET /21c4408c8eadce9e579fb5fe6f1d0d585eece97ae15462d3b45b5c803790a51e/P2Wkxmt6hAfn3TwsqZ0IDxxLraODxK072kqLRv1DhtPH5grRho73WBtxTxE4Txs-okpAkT_NLFQRTUpYzE106ksKmTrNIf-S5VNa6RpgJAb_H-aL-8ZLm2BRsBt7LGwc_EWp4i5OI8RPGjJNKC_N5wd31BtFVfci2HgMkhujAtvY9rq38ChPkrhXG_MEKUCG9WK0l15OKlZD-kFXkVYipqUqFrc:QFBqVYm1F8PuSdLddq3jXg HTTP/1.1", upstream: "http://10.40.144.35:80/media/pictures/2017/6/16/thumbs/740x415/umer-byvshij-kantsler-germanii-gelmut-kol_rect_6878d4dd6c71ef9af42b755f9cc513f3.jpg", host: "imgprx.cdn.example", referrer: "https://blog.example/"
+2026/09/20 00:04:42 [error] 3960781#3960781: *610776955 www.example.test could not be resolved (2: Server failure), client: 198.51.100.105, server: imgprx.cdn.example, request: "GET /eba0eb4b51d41602fd374b243a0525860170f8ed0c18bbea06510bb1300dcd43/P2WlxyVijxKvi29n9shWVkMdsf-ah7h0ykWQCrBalZ7Q_BWagMDqH1prA0h5Ckh_og1AjDHRYgdWUgBczE90rxdA2jqebaeL_V0SuQ:TBKwITNiToCrEgq8pcsdfA HTTP/1.1", host: "imgprx.cdn.example", referrer: "https://blog.example/"
+2026/09/20 00:04:43 [warn] 3960784#3960784: *610384378 upstream server temporarily disabled while connecting to upstream, client: 198.51.100.60, server: imgprx.cdn.example, request: "GET /d299dcd778434686efb41fb9cf14834d74fdfe59cbd943b980514b03ff38fbba/P2WlxyVijxKvi29m_8ZWUkMdsf-ah7h02EqACaBVisLfvRfGko72WG92IhZWSwAn42QH0WmLNVYIRHRUvFVq3h8p0ibqa7rVvHlvpwkxFRH1RdyaoZFxnjQI6S1gMFQKz1rtuGlVK4pt:ExQSkog8lGLnoW_p6GbVJA HTTP/1.1", upstream: "http://10.221.98.166:80/30E0B1A5-65F2-4565-9F8A-1A9F91E3341C_cx0_cy6_cw0_w987_r1_s_r1.jpg", host: "imgprx.cdn.example", referrer: "https://blog.example/"
+2026/09/20 00:04:44 [warn] 3960781#3960781: *610703621 using uninitialized "img_url" variable while logging request, client: 192.0.2.157, server: imgprx.cdn.example, request: "GET /robots.txt HTTP/1.1", host: "imgprx.cdn.example"
+2026/09/20 00:04:45 [warn] 3960781#3960781: *610703621 using uninitialized "img_host" variable while logging request, client: 192.0.2.157, server: imgprx.cdn.example, request: "GET /robots.txt HTTP/1.1", host: "imgprx.cdn.example"
+2026/09/20 00:04:46 [warn] 3960780#3960780: *610717657 using uninitialized "img_url" variable while logging request, client: 203.0.113.50, server: , request: "GET /qMBwdBV7/IMG-20260702-215148.jpg?w=1500&h=1500 HTTP/1.1", upstream: "http://10.211.138.88:443/qMBwdBV7/IMG-20260702-215148.jpg?w=1500&h=1500", host: "i.example.test"
+2026/09/20 00:04:47 [error] 3960783#3960783: *612037430 connect() failed (113: No route to host) while connecting to upstream, client: 192.0.2.172, server: imgprx.cdn.example, request: "GET /f8ec8862b473d79c89134af19026647202e57f70536d15b02409b0a244d2c9b2/P2WlxyVijxKvi29n8s1QUUMdsf-ah7h0jR_VCeMK1p6Co0uaxJf8R0YsTxUnThk_5hMbzWyRag5CTQRClwg8vVs:j5DNL9mMEno3LYmFHrIJxw HTTP/1.1", upstream: "http://10.138.236.52:80/lj/2004.01.11/img06.jpg", host: "imgprx.cdn.example", referrer: "https://users.blog.example/"
+2026/09/20 00:04:48 [error] 3960781#3960781: unexpected DNS response for www.example.test
+2026/09/20 00:04:49 [error] 3960783#3960783: *610415188 www.example.test could not be resolved (110: Operation timed out), client: 198.51.100.99, server: imgprx.cdn.example, request: "GET /b53c1e9c8866edbe5ff129121b85d3d2843fdf8078d73aa4be1b349765ec569e/P2Wkxmt6hAfgxS9wq5ACBR1RsOyawPF43EGPCL9WgtLW4RHZlMagGwU2AUlwIV1wsUcEzm_hYAxVBANClwg8vQpNn2SNYrjWtQMH_UA3f0Hx:CoHLnxSha2O3xGfsLfCHvA HTTP/1.1", host: "imgprx.cdn.example", referrer: "https://blog.example/"
+2026/09/20 00:04:50 [error] 179006#179006: disable check peer: 10.238.48.224:8081
+2026/09/20 00:04:51 [alert] 3960782#3960782: *609275478 send() failed (90: Message too long), client: 198.51.100.136, server: www.blog.example, request: "POST /csp_reports HTTP/1.1", host: "www.blog.example"
+2026/09/20 00:04:52 [error] 3960782#3960782: *618721669 connect() failed (101: Network is unreachable) while connecting to upstream, client: 192.0.2.212, server: imgprx.cdn.example, request: "GET /88ab9bd46eadb25e7460b1540c6aca3f5a308cb520874764516d0547545226b7/P2Wkxmt6hAfgxS9wsZoEDABYreCXwuclkU2NSv1FwcCM5hHQyNK1AUQiDAFnF0ks4hoMym-HJRBMGQ8ahzdop1EXr0SfeqXD-UkS_kA2cku0RLTN55ZT:6kFiezn-bVyzPf2SImNckQ HTTP/1.1", upstream: "http://10.183.149.205:80/v.p?uid=spindl&pid=489629&sid=vzO38wxDS0", host: "imgprx.cdn.example", referrer: "https://users.blog.example/"
+2026/09/20 00:04:53 [error] 3960780#3960780: *609413334 upstream sent invalid header: "\x09..." while reading response header from upstream, client: 192.0.2.131, server: imgprx.cdn.example, request: "GET /c5f039b9b9871de5ff53c54ea9a80ad59e9fec890896cfbd53b61318d657bb96/P2WlxyVijxKvi25n9s1QU0Mdsf-ah7h00lfMXrNX3Z7Q_FbdmY6VB1ozEG56H0p0-WpaiALOag1ELVsPzlYx70FNlg:QIQZBmxpnSYtsN1TF8e2RQ HTTP/1.1", upstream: "http://10.20.52.71:80/PopupImage/Hot_pinaPic3.jpg", host: "imgprx.cdn.example"
+2026/09/20 00:04:54 [warn] 3960783#3960783: *617930912 upstream sent duplicate header line: "Content-Type: text/html; charset=utf-8", previous value: "Content-Type: image/png", ignored while reading response header from upstream, client: 198.51.100.144, server: imgprx.cdn.example, request: "GET /cb7c8f06d17c4aa7ff8400ded75f6e0389f93226161565bb4f3e9b83131c150f/P2WlxyVijxKvi2Bp8M1TVkMdsf-ah7h0yFmVCbtSldGd8BfZ2taqGkFpURUnTxwilQ1cnSffMlQUSgFYyEtoqBBZ2yeBKOeGr0c:Ew0y3kvW7MXCm2x0Jhz_QQ HTTP/1.1", upstream: "http://10.198.128.216:80/work/120113C/iaza17173453376600.png", host: "imgprx.cdn.example", referrer: "https://egl.blog.example/"
+2026/09/20 00:04:55 [error] 179008#179008: enable check peer: 10.238.48.224:8081
+2026/09/20 00:04:56 [error] 179006#179006: recv() failed (104: Connection reset by peer)
+2026/09/20 00:04:57 [error] 179006#179006: disable check peer: 10.163.165.103:8081
+2026/09/20 00:04:58 [error] 179008#179008: enable check peer: 10.163.165.103:8081
+2026/09/20 00:04:59 [error] 179003#179003: disable check peer: 10.62.229.216:8081
+2026/09/20 00:05:00 [error] 179007#179007: enable check peer: 10.62.229.216:8081
+2026/09/20 00:05:01 [error] 179007#179007: disable check peer: 10.163.165.103:8081
+2026/09/20 00:05:02 [error] 179006#179006: disable check peer: 10.62.229.216:8081
+2026/09/20 00:05:03 [error] 179007#179007: enable check peer: 10.163.165.103:8081
+2026/09/20 00:05:04 [error] 179008#179008: enable check peer: 10.62.229.216:8081
+2026/09/20 00:05:05 [error] 179002#179002: *3072731014 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:05:06 [error] 179002#179002: *3072731014 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:05:07 [error] 179008#179008: *3072749257 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 203.0.113.218, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:05:08 [error] 179002#179002: *3072731014 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:05:09 [error] 179002#179002: *3072731014 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:05:10 [error] 179007#179007: *3073415939 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 198.51.100.151, server: embeds.example.com, request: "GET /finance/?start=1788671828&end=1789881428 HTTP/1.1", upstream: "http://10.151.8.10:80/v1/sources/?start=1788671828&end=1789881428", host: "embeds.example.com", referrer: "https://rag.example.com/"
+2026/09/20 00:05:11 [error] 179007#179007: *3073475019 access forbidden by rule, client: 198.51.100.200, server: mcp-agent-stage.example.com, request: "GET /stats/prometheus HTTP/1.1", host: "mcp-agent-stage.example.com"
+2026/09/20 00:05:12 [error] 179002#179002: disable check peer: 10.216.188.161:80
+2026/09/20 00:05:13 [error] 179004#179004: disable check peer: 10.216.188.161:80
+2026/09/20 00:05:14 [error] 179008#179008: disable check peer: 10.216.188.161:80
+2026/09/20 00:05:15 [error] 179001#179001: enable check peer: 10.216.188.161:80
+2026/09/20 00:05:16 [error] 179008#179008: enable check peer: 10.216.188.161:80
+2026/09/20 00:05:17 [error] 179002#179002: enable check peer: 10.216.188.161:80
+2026/09/20 00:05:18 [error] 179007#179007: recv() failed (104: Connection reset by peer)
+2026/09/20 00:05:19 [error] 179006#179006: *3073894357 upstream prematurely closed connection while reading response header from upstream, client: 203.0.113.141, server: embeds.example.com, request: "GET /finance/?start=1788676373&end=1789885973 HTTP/1.1", upstream: "http://10.151.8.10:80/v1/sources/?start=1788676373&end=1789885973", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:05:20 [error] 179008#179008: disable check peer: 10.163.165.103:8081
+2026/09/20 00:05:21 [error] 179001#179001: enable check peer: 10.163.165.103:8081
+2026/09/20 00:05:22 [error] 179005#179005: disable check peer: 10.238.48.224:8081
+2026/09/20 00:05:23 [error] 179004#179004: enable check peer: 10.238.48.224:8081
+2026/09/20 00:05:24 [error] 179006#179006: disable check peer: 10.238.48.224:8081
+2026/09/20 00:05:25 [error] 179007#179007: enable check peer: 10.238.48.224:8081
+2026/09/20 00:05:26 [error] 179004#179004: recv() failed (104: Connection reset by peer)
+2026/09/20 00:05:27 [error] 179005#179005: disable check peer: 10.240.40.110:80
+2026/09/20 00:05:28 [error] 179002#179002: enable check peer: 10.240.40.110:80
+2026/09/20 00:05:29 [error] 179004#179004: disable check peer: 10.163.165.103:8081
+2026/09/20 00:05:30 [error] 179008#179008: enable check peer: 10.163.165.103:8081
+2026/09/20 00:05:31 [error] 179003#179003: disable check peer: 10.238.48.224:8081
+2026/09/20 00:05:32 [error] 179001#179001: enable check peer: 10.238.48.224:8081
+2026/09/20 00:05:33 [error] 179005#179005: disable check peer: 10.62.229.216:8081
+2026/09/20 00:05:34 [error] 179007#179007: enable check peer: 10.62.229.216:8081
+2026/09/20 00:05:35 [error] 179006#179006: *3075401081 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 198.51.100.210, server: embeds.example.com, request: "GET /finance/?start=1788679860&end=1789889460 HTTP/1.1", upstream: "http://10.127.149.219:80/v1/sources/?start=1788679860&end=1789889460", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:05:36 [error] 179001#179001: recv() failed (104: Connection reset by peer)
+2026/09/20 00:05:37 [error] 179007#179007: recv() failed (104: Connection reset by peer)
+2026/09/20 00:05:38 [error] 179004#179004: disable check peer: 10.163.165.103:8081
+2026/09/20 00:05:39 [error] 179006#179006: enable check peer: 10.163.165.103:8081
+2026/09/20 00:05:40 [error] 179002#179002: disable check peer: 10.137.213.164:80
+2026/09/20 00:05:41 [error] 179001#179001: enable check peer: 10.137.213.164:80
+2026/09/20 00:05:42 [error] 179001#179001: disable check peer: 10.240.40.110:80
+2026/09/20 00:05:43 [error] 179004#179004: disable check peer: 10.240.40.110:80
+2026/09/20 00:05:44 [error] 179008#179008: disable check peer: 10.240.40.110:80
+2026/09/20 00:05:45 [error] 179001#179001: enable check peer: 10.240.40.110:80
+2026/09/20 00:05:46 [error] 179006#179006: enable check peer: 10.240.40.110:80
+2026/09/20 00:05:47 [error] 179006#179006: enable check peer: 10.240.40.110:80
+2026/09/20 00:05:48 [error] 179001#179001: *3076098883 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 198.51.100.140, server: tv.example.com, request: "GET /2-1708678-111/d501fde5-55b6-488c-8dd3-d8ef14fb910e/ HTTP/1.1", upstream: "http://10.212.156.164:80/2-1708678-111/d501fde5-55b6-488c-8dd3-d8ef14fb910e/", host: "tv.example.com", referrer: "https://tv.example.com/"
+2026/09/20 00:05:49 [error] 179007#179007: *3076272676 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 198.51.100.17, server: embeds.example.com, request: "GET /finance/?start=1788682088&end=1789891688 HTTP/1.1", upstream: "http://10.186.169.177:80/v1/sources/?start=1788682088&end=1789891688", host: "embeds.example.com", referrer: "https://wrg.example.com/other/41361320/"
+2026/09/20 00:05:50 [error] 179007#179007: disable check peer: 10.62.229.216:8081
+2026/09/20 00:05:51 [error] 179006#179006: enable check peer: 10.62.229.216:8081
+2026/09/20 00:05:52 [error] 179007#179007: *3076887912 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 192.0.2.3, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:05:53 [error] 179007#179007: *3076846226 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 192.0.2.3, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:05:54 [error] 179006#179006: *3076765846 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 192.0.2.3, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:05:55 [error] 179007#179007: *3076846226 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 192.0.2.3, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:05:56 [error] 179007#179007: *3076846226 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 192.0.2.3, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:05:57 [error] 179007#179007: *3076846227 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 192.0.2.3, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:05:58 [error] 179007#179007: *3076846227 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 192.0.2.3, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:05:59 [error] 179007#179007: *3076846226 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 192.0.2.3, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:06:00 [error] 179007#179007: *3076846226 open() "/var/nginx/anon/7142a8f675_lander" failed (2: No such file or directory), client: 192.0.2.3, server: ap.example.com, request: "GET /lander HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:06:01 [error] 179008#179008: *3077000598 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 203.0.113.144, server: embeds.example.com, request: "GET /finance/?start=1789288510&end=1789893310 HTTP/1.1", upstream: "http://10.87.58.74:80/v1/sources/cbr/instruments/?start=1789288510&end=1789893310", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:06:02 [error] 179003#179003: recv() failed (104: Connection reset by peer)
+2026/09/20 00:06:03 [error] 179007#179007: disable check peer: 10.238.48.224:8081
+2026/09/20 00:06:04 [error] 179001#179001: enable check peer: 10.238.48.224:8081
+2026/09/20 00:06:05 [error] 179001#179001: disable check peer: 10.163.165.103:8081
+2026/09/20 00:06:06 [error] 179001#179001: enable check peer: 10.163.165.103:8081
+2026/09/20 00:06:07 [warn] 179005#179005: *3077501712 a client request body is buffered to a temporary file /spool/nginx/client/0385750146, client: 10.193.224.72, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:06:08 [error] 179003#179003: disable check peer: 10.238.48.224:8081
+2026/09/20 00:06:09 [error] 179007#179007: enable check peer: 10.238.48.224:8081
+2026/09/20 00:06:10 [error] 179002#179002: *3077435402 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 203.0.113.72, server: embeds.example.com, request: "GET /finance/?start=1789289822&end=1789894622 HTTP/1.1", upstream: "http://10.163.243.93:80/v1/sources/cbr/instruments/?start=1789289822&end=1789894622", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:06:11 [notice] 1638#1638: signal 1 (SIGHUP) received from 271843, reconfiguring
+2026/09/20 00:06:12 [notice] 1638#1638: reconfiguring
+2026/09/20 00:06:13 [notice] 1638#1638: using binary geo range base "/var/nginx/anon/ceafc76410_geo.conf.bin" in /etc/nginx/nginx.conf:177
+2026/09/20 00:06:14 [notice] 1638#1638: using binary geo range base "/var/nginx/anon/ceafc76410_geo.conf.bin" in /etc/nginx/nginx.conf:182
+2026/09/20 00:06:15 [notice] 1638#1638: ModSecurity-nginx v1.0.4 (rules loaded inline/local/remote: 0/0/0)
+2026/09/20 00:06:16 [notice] 1638#1638: libmodsecurity3 version 3.0.14
+2026/09/20 00:06:17 [notice] 1638#1638: using the "epoll" event method
+2026/09/20 00:06:18 [notice] 1638#1638: start worker processes
+2026/09/20 00:06:19 [notice] 1638#1638: start worker process 271857
+2026/09/20 00:06:20 [notice] 1638#1638: start worker process 271858
+2026/09/20 00:06:21 [notice] 1638#1638: start worker process 271859
+2026/09/20 00:06:22 [notice] 1638#1638: start worker process 271860
+2026/09/20 00:06:23 [notice] 1638#1638: start worker process 271861
+2026/09/20 00:06:24 [notice] 1638#1638: start worker process 271862
+2026/09/20 00:06:25 [notice] 1638#1638: start worker process 271863
+2026/09/20 00:06:26 [notice] 1638#1638: start worker process 271864
+2026/09/20 00:06:27 [notice] 1638#1638: start cache manager process 271865
+2026/09/20 00:06:28 [notice] 179001#179001: gracefully shutting down
+2026/09/20 00:06:29 [notice] 179002#179002: gracefully shutting down
+2026/09/20 00:06:30 [notice] 179003#179003: gracefully shutting down
+2026/09/20 00:06:31 [notice] 179004#179004: clear all the events on 179004
+2026/09/20 00:06:32 [notice] 179008#179008: gracefully shutting down
+2026/09/20 00:06:33 [notice] 179005#179005: gracefully shutting down
+2026/09/20 00:06:34 [notice] 179004#179004: gracefully shutting down
+2026/09/20 00:06:35 [notice] 179009#179009: exiting
+2026/09/20 00:06:36 [notice] 179006#179006: gracefully shutting down
+2026/09/20 00:06:37 [notice] 179007#179007: gracefully shutting down
+2026/09/20 00:06:38 [notice] 179006#179006: clear all the events on 179006
+2026/09/20 00:06:39 [notice] 179008#179008: clear all the events on 179008
+2026/09/20 00:06:40 [notice] 179007#179007: clear all the events on 179007
+2026/09/20 00:06:41 [notice] 1638#1638: signal 17 (SIGCHLD) received from 179009
+2026/09/20 00:06:42 [notice] 1638#1638: cache manager process 179009 exited with code 0
+2026/09/20 00:06:43 [notice] 179001#179001: clear all the events on 179001
+2026/09/20 00:06:44 [notice] 1638#1638: signal 29 (SIGIO) received
+2026/09/20 00:06:45 [notice] 179001#179001: exiting
+2026/09/20 00:06:46 [notice] 179001#179001: exit
+2026/09/20 00:06:47 [notice] 1638#1638: signal 17 (SIGCHLD) received from 179001
+2026/09/20 00:06:48 [notice] 179005#179005: clear all the events on 179005
+2026/09/20 00:06:49 [notice] 1638#1638: worker process 179001 exited with code 0
+2026/09/20 00:06:50 [notice] 1638#1638: signal 29 (SIGIO) received
+2026/09/20 00:06:51 [notice] 179003#179003: clear all the events on 179003
+2026/09/20 00:06:52 [notice] 179002#179002: clear all the events on 179002
+2026/09/20 00:06:53 [notice] 179002#179002: exiting
+2026/09/20 00:06:54 [notice] 179002#179002: exit
+2026/09/20 00:06:55 [notice] 1638#1638: signal 17 (SIGCHLD) received from 179002
+2026/09/20 00:06:56 [notice] 1638#1638: worker process 179002 exited with code 0
+2026/09/20 00:06:57 [notice] 1638#1638: signal 29 (SIGIO) received
+2026/09/20 00:06:58 [notice] 179006#179006: exiting
+2026/09/20 00:06:59 [notice] 179006#179006: exit
+2026/09/20 00:07:00 [notice] 1638#1638: signal 17 (SIGCHLD) received from 179006
+2026/09/20 00:07:01 [notice] 1638#1638: worker process 179006 exited with code 0
+2026/09/20 00:07:02 [notice] 1638#1638: signal 29 (SIGIO) received
+2026/09/20 00:07:03 [notice] 179004#179004: exiting
+2026/09/20 00:07:04 [notice] 179004#179004: exit
+2026/09/20 00:07:05 [notice] 1638#1638: signal 17 (SIGCHLD) received from 179004
+2026/09/20 00:07:06 [notice] 1638#1638: worker process 179004 exited with code 0
+2026/09/20 00:07:07 [notice] 1638#1638: signal 29 (SIGIO) received
+2026/09/20 00:07:08 [notice] 179005#179005: exiting
+2026/09/20 00:07:09 [notice] 179005#179005: exit
+2026/09/20 00:07:10 [notice] 1638#1638: signal 17 (SIGCHLD) received from 179005
+2026/09/20 00:07:11 [notice] 1638#1638: worker process 179005 exited with code 0
+2026/09/20 00:07:12 [notice] 1638#1638: signal 29 (SIGIO) received
+2026/09/20 00:07:13 [notice] 179003#179003: exiting
+2026/09/20 00:07:14 [notice] 179003#179003: exit
+2026/09/20 00:07:15 [notice] 1638#1638: signal 17 (SIGCHLD) received from 179003
+2026/09/20 00:07:16 [notice] 1638#1638: worker process 179003 exited with code 0
+2026/09/20 00:07:17 [notice] 1638#1638: signal 29 (SIGIO) received
+2026/09/20 00:07:18 [error] 271859#271859: disable check peer: 10.137.213.164:80
+2026/09/20 00:07:19 [error] 271862#271862: disable check peer: 10.137.213.164:80
+2026/09/20 00:07:20 [error] 271864#271864: disable check peer: 10.137.213.164:80
+2026/09/20 00:07:21 [notice] 179008#179008: exiting
+2026/09/20 00:07:22 [notice] 179008#179008: exit
+2026/09/20 00:07:23 [notice] 1638#1638: signal 17 (SIGCHLD) received from 179008
+2026/09/20 00:07:24 [notice] 1638#1638: worker process 179008 exited with code 0
+2026/09/20 00:07:25 [notice] 1638#1638: signal 29 (SIGIO) received
+2026/09/20 00:07:26 [notice] 179007#179007: exiting
+2026/09/20 00:07:27 [notice] 179007#179007: exit
+2026/09/20 00:07:28 [notice] 1638#1638: signal 17 (SIGCHLD) received from 179007
+2026/09/20 00:07:29 [notice] 1638#1638: worker process 179007 exited with code 0
+2026/09/20 00:07:30 [notice] 1638#1638: signal 29 (SIGIO) received
+2026/09/20 00:07:31 [error] 271861#271861: *3077642704 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:32 [error] 271860#271860: *3077636393 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:33 [error] 271861#271861: *3077642704 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:34 [error] 271860#271860: *3077636393 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:35 [error] 271861#271861: *3077642704 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:36 [error] 271861#271861: *3077642704 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:37 [error] 271861#271861: *3077663041 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:38 [error] 271861#271861: *3077663041 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:39 [error] 271861#271861: *3077663041 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:40 [error] 271861#271861: *3077663041 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:41 [error] 271861#271861: *3077663041 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:42 [error] 271861#271861: *3077663041 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:43 [error] 271862#271862: *3077634476 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:44 [error] 271862#271862: *3077634476 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:45 [error] 271861#271861: *3077663041 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:46 [error] 271861#271861: *3077663041 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:47 [error] 271861#271861: *3077663041 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:48 [error] 271861#271861: *3077663041 access forbidden by rule, client: 192.0.2.113, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:07:49 [error] 271859#271859: *3077645858 upstream prematurely closed connection while reading response header from upstream, client: 198.51.100.41, server: embeds.example.com, request: "GET /finance/?start=1789290241&end=1789895041 HTTP/1.1", upstream: "http://10.87.58.74:80/v1/sources/cbr/instruments/?start=1789290241&end=1789895041", host: "embeds.example.com", referrer: "https://rag.example.com/world/57095744/"
+2026/09/20 00:07:50 [error] 271860#271860: *3077788024 client sent too short userid cookie "REDACTED", client: 192.0.2.60, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/"
+2026/09/20 00:07:51 [error] 271858#271858: *3077826908 client sent too short userid cookie "REDACTED", client: 192.0.2.60, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/"
+2026/09/20 00:07:52 [error] 271862#271862: *3077944944 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 198.51.100.24, server: embeds.example.com, request: "GET /finance/?start=1789290849&end=1789895649 HTTP/1.1", upstream: "http://10.18.118.234:80/v1/sources/?start=1789290849&end=1789895649", host: "embeds.example.com", referrer: "https://wmn.example.com/"
+2026/09/20 00:07:53 [error] 271864#271864: disable check peer: 10.216.188.161:80
+2026/09/20 00:07:54 [error] 271858#271858: disable check peer: 10.216.188.161:80
+2026/09/20 00:07:55 [error] 271859#271859: disable check peer: 10.216.188.161:80
+2026/09/20 00:07:56 [error] 271861#271861: enable check peer: 10.216.188.161:80
+2026/09/20 00:07:57 [error] 271861#271861: enable check peer: 10.216.188.161:80
+2026/09/20 00:07:58 [error] 271862#271862: enable check peer: 10.216.188.161:80
+2026/09/20 00:07:59 [error] 271861#271861: *3078448926 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 203.0.113.176, server: embeds.example.com, request: "GET /finance/?start=1788687242&end=1789896842 HTTP/1.1", upstream: "http://10.18.118.234:80/v1/sources/cbr/instruments/?start=1788687242&end=1789896842", host: "embeds.example.com", referrer: "https://rag.example.com/"
+2026/09/20 00:08:00 [warn] 271862#271862: *3078525660 a client request body is buffered to a temporary file /spool/nginx/client/0385798997, client: 10.161.106.160, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:08:01 [error] 271861#271861: *3078461622 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 192.0.2.110, server: embeds.example.com, request: "GET /finance/?start=1789292462&end=1789897262 HTTP/1.1", upstream: "http://10.52.165.21:80/v1/sources/cbr/instruments/?start=1789292462&end=1789897262", host: "embeds.example.com", referrer: "https://rag.example.com/incidents/"
+2026/09/20 00:08:02 [error] 271857#271857: *3078764828 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 203.0.113.218, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:08:03 [error] 271858#271858: *3078845001 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:08:04 [error] 271858#271858: *3078845001 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:08:05 [error] 271861#271861: *3078805858 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:08:06 [error] 271861#271861: *3078805858 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET / HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:08:07 [error] 271864#271864: *3078816227 upstream prematurely closed connection while reading response header from upstream, client: 203.0.113.183, server: embeds.example.com, request: "GET /finance/?start=1788688323&end=1789897923 HTTP/1.1", upstream: "http://10.79.23.145:80/v1/sources/cbr/instruments/?start=1788688323&end=1789897923", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:08:08 [error] 271861#271861: *3079065048 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 192.0.2.119, server: embeds.example.com, request: "GET /finance/?start=1789293483&end=1789898283 HTTP/1.1", upstream: "http://10.160.194.250:80/v1/sources/cbr/instruments/?start=1789293483&end=1789898283", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:08:09 [error] 271858#271858: recv() failed (104: Connection reset by peer)
+2026/09/20 00:08:10 [error] 271864#271864: disable check peer: 10.62.229.216:8081
+2026/09/20 00:08:11 [error] 271858#271858: enable check peer: 10.62.229.216:8081
+2026/09/20 00:08:12 [error] 271857#271857: *3079324529 client sent too short userid cookie "REDACTED", client: 192.0.2.60, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/"
+2026/09/20 00:08:13 [error] 271864#271864: *3079335994 upstream prematurely closed connection while reading response header from upstream, client: 203.0.113.230, server: embeds.example.com, request: "GET /finance/?start=1789294142&end=1789898942 HTTP/1.1", upstream: "http://10.160.194.250:80/v1/sources/cbr/instruments/?start=1789294142&end=1789898942", host: "embeds.example.com", referrer: "https://wmn.example.com/52269786/"
+2026/09/20 00:08:14 [error] 271858#271858: *3079488075 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:15 [error] 271858#271858: *3079488075 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:16 [error] 271861#271861: *3079492103 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:17 [error] 271861#271861: *3079492103 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:18 [error] 271864#271864: *3079421912 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:19 [error] 271864#271864: *3079421912 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:20 [error] 271864#271864: *3079421912 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:21 [error] 271864#271864: *3079421912 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:22 [error] 271864#271864: *3079421912 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:23 [error] 271864#271864: *3079421912 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:24 [error] 271858#271858: *3079254824 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:25 [error] 271858#271858: *3079254824 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:26 [error] 271864#271864: *3079421912 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:27 [error] 271864#271864: *3079421912 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:28 [error] 271864#271864: *3079421912 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:29 [error] 271864#271864: *3079421912 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:30 [error] 271860#271860: *3079529129 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:31 [error] 271860#271860: *3079529129 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:32 [error] 271863#271863: disable check peer: 10.238.48.224:8081
+2026/09/20 00:08:33 [error] 271864#271864: enable check peer: 10.238.48.224:8081
+2026/09/20 00:08:34 [error] 271863#271863: *3080224498 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:35 [error] 271863#271863: *3080224498 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:36 [error] 271858#271858: *3080222061 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:37 [error] 271858#271858: *3080222061 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:38 [error] 271858#271858: *3080222061 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:39 [error] 271858#271858: *3080222061 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:40 [error] 271863#271863: *3080224498 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:41 [error] 271863#271863: *3080224498 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:42 [error] 271863#271863: *3080224498 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:43 [error] 271863#271863: *3080224498 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:44 [error] 271858#271858: *3080222061 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:45 [error] 271858#271858: *3080222061 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:46 [error] 271858#271858: *3080222061 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:47 [error] 271858#271858: *3080222061 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:48 [error] 271861#271861: *3080222618 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:49 [error] 271861#271861: *3080222618 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:50 [error] 271859#271859: disable check peer: 10.163.165.103:8081
+2026/09/20 00:08:51 [error] 271862#271862: *3080273999 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:52 [error] 271862#271862: *3080273999 access forbidden by rule, client: 198.51.100.123, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:08:53 [error] 271862#271862: enable check peer: 10.163.165.103:8081
+2026/09/20 00:08:54 [warn] 271860#271860: *3080394032 a client request body is buffered to a temporary file /spool/nginx/client/0385890353, client: 10.161.106.160, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:08:55 [error] 271858#271858: *3080398406 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:08:56 [error] 271858#271858: *3080398406 access forbidden by rule, client: 203.0.113.218, server: assistant.example.com, request: "GET /chat/sdk.js HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:08:57 [error] 271859#271859: *3080402785 access forbidden by rule, client: 192.0.2.121, server: assistant.example.com, request: "GET /file/include?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:08:58 [error] 271859#271859: *3080402785 access forbidden by rule, client: 192.0.2.121, server: assistant.example.com, request: "GET /file/include?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:08:59 [error] 271857#271857: *3080366169 access forbidden by rule, client: 198.51.100.251, server: assistant.example.com, request: "GET /file/load?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:00 [error] 271857#271857: *3080366169 access forbidden by rule, client: 198.51.100.251, server: assistant.example.com, request: "GET /file/load?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:01 [error] 271859#271859: *3080359590 access forbidden by rule, client: 203.0.113.58, server: assistant.example.com, request: "GET /file/download?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:02 [error] 271859#271859: *3080359590 access forbidden by rule, client: 203.0.113.58, server: assistant.example.com, request: "GET /file/download?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:03 [error] 271859#271859: *3080251720 access forbidden by rule, client: 203.0.113.58, server: assistant.example.com, request: "GET /api/get/file?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:04 [error] 271859#271859: *3080251720 access forbidden by rule, client: 203.0.113.58, server: assistant.example.com, request: "GET /api/get/file?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:05 [error] 271864#271864: *3080327205 access forbidden by rule, client: 198.51.100.164, server: assistant.example.com, request: "GET /api/v1/download?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:06 [error] 271864#271864: *3080327205 access forbidden by rule, client: 198.51.100.164, server: assistant.example.com, request: "GET /api/v1/download?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:07 [error] 271860#271860: *3080361054 access forbidden by rule, client: 192.0.2.82, server: assistant.example.com, request: "GET /fetchfile?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:08 [error] 271860#271860: *3080361054 access forbidden by rule, client: 192.0.2.82, server: assistant.example.com, request: "GET /fetchfile?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:09 [error] 271859#271859: *3080278925 access forbidden by rule, client: 192.0.2.82, server: assistant.example.com, request: "GET /download-file?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:10 [error] 271859#271859: *3080278925 access forbidden by rule, client: 192.0.2.82, server: assistant.example.com, request: "GET /download-file?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:11 [error] 271860#271860: *3080274288 access forbidden by rule, client: 192.0.2.159, server: assistant.example.com, request: "GET /read?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:12 [error] 271860#271860: *3080274288 access forbidden by rule, client: 192.0.2.159, server: assistant.example.com, request: "GET /read?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:13 [error] 271862#271862: *3080394782 access forbidden by rule, client: 198.51.100.164, server: assistant.example.com, request: "GET /load/file?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:14 [error] 271862#271862: *3080394782 access forbidden by rule, client: 198.51.100.164, server: assistant.example.com, request: "GET /load/file?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:15 [error] 271861#271861: *3080281590 access forbidden by rule, client: 192.0.2.82, server: assistant.example.com, request: "GET /view/file?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:16 [error] 271861#271861: *3080281590 access forbidden by rule, client: 192.0.2.82, server: assistant.example.com, request: "GET /view/file?file=file:///etc/./passwd&path=file:///etc/./passwd&filename=file:///etc/./passwd&download=file:///etc/./passwd&url=file:///etc/./passwd&preview_file=file:///etc/./passwd&attachment=file:///etc/./passwd&document=file:///etc/./passwd&page=file:///etc/./passwd&template=file:///etc/./passwd HTTP/1.1", host: "assistant.example.com"
+2026/09/20 00:09:17 [error] 271860#271860: *3080581759 client sent too short userid cookie "REDACTED", client: 192.0.2.91, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/"
+2026/09/20 00:09:18 [error] 271859#271859: *3080670582 client sent too short userid cookie "REDACTED", client: 192.0.2.91, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/"
+2026/09/20 00:09:19 [error] 271858#271858: *3081002795 upstream prematurely closed connection while reading response header from upstream, client: 198.51.100.119, server: embeds.example.com, request: "GET /finance/?start=1788693134&end=1789902734 HTTP/1.1", upstream: "http://10.186.169.177:80/v1/sources/cbr/instruments/?start=1788693134&end=1789902734", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:09:20 [error] 271860#271860: *3081021656 upstream prematurely closed connection while reading response header from upstream, client: 203.0.113.207, server: embeds.example.com, request: "GET /finance/?start=1789297980&end=1789902780 HTTP/1.1", upstream: "http://10.163.243.93:80/v1/sources/cbr/instruments/?start=1789297980&end=1789902780", host: "embeds.example.com", referrer: "https://finance.example.com/12/"
+2026/09/20 00:09:21 [error] 271862#271862: disable check peer: 10.62.229.216:8081
+2026/09/20 00:09:22 [error] 271858#271858: enable check peer: 10.62.229.216:8081
+2026/09/20 00:09:23 [warn] 271860#271860: *3081256772 a client request body is buffered to a temporary file /spool/nginx/client/0385933407, client: 10.78.122.79, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:09:24 [warn] 271858#271858: *3081266368 a client request body is buffered to a temporary file /spool/nginx/client/0385933412, client: 10.78.122.79, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:09:25 [warn] 271863#271863: *3081316369 a client request body is buffered to a temporary file /spool/nginx/client/0385935847, client: 10.78.122.79, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:09:26 [warn] 271863#271863: *3081354356 a client request body is buffered to a temporary file /spool/nginx/client/0385937738, client: 10.78.122.79, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:09:27 [error] 271860#271860: *3081476432 upstream prematurely closed connection while reading response header from upstream, client: 192.0.2.99, server: embeds.example.com, request: "GET /finance/instruments/?start=1789299304&end=1789904104 HTTP/1.1", upstream: "http://10.163.243.93:80/v1/sources/?start=1789299304&end=1789904104", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:09:28 [error] 271862#271862: *3081455910 "/var/nginx/anon/7cd63815e1_index.html" is not found (2: No such file or directory), client: 203.0.113.238, server: ap.example.com, request: "GET / HTTP/1.1", host: "ap.example.com"
+2026/09/20 00:09:29 [error] 271863#271863: disable check peer: 10.163.165.103:8081
+2026/09/20 00:09:30 [error] 271861#271861: enable check peer: 10.163.165.103:8081
+2026/09/20 00:09:31 [error] 271860#271860: disable check peer: 10.62.229.216:8081
+2026/09/20 00:09:32 [error] 271860#271860: enable check peer: 10.62.229.216:8081
+2026/09/20 00:09:33 [error] 271861#271861: disable check peer: 10.163.165.103:8081
+2026/09/20 00:09:34 [error] 271862#271862: disable check peer: 10.238.48.224:8081
+2026/09/20 00:09:35 [error] 271864#271864: enable check peer: 10.163.165.103:8081
+2026/09/20 00:09:36 [error] 271862#271862: enable check peer: 10.238.48.224:8081
+2026/09/20 00:09:37 [error] 271863#271863: recv() failed (104: Connection reset by peer)
+2026/09/20 00:09:38 [error] 271864#271864: *3082455824 client sent too short userid cookie "REDACTED", client: 192.0.2.91, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/2780"
+2026/09/20 00:09:39 [error] 271863#271863: *3082455292 client sent too short userid cookie "REDACTED", client: 192.0.2.91, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/2781"
+2026/09/20 00:09:40 [error] 271859#271859: *3082348583 client sent too short userid cookie "REDACTED", client: 192.0.2.91, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/72"
+2026/09/20 00:09:41 [error] 271862#271862: disable check peer: 10.62.229.216:8081
+2026/09/20 00:09:42 [error] 271864#271864: enable check peer: 10.62.229.216:8081
+2026/09/20 00:09:43 [error] 271858#271858: *3082586693 client sent too short userid cookie "REDACTED", client: 192.0.2.91, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/198"
+2026/09/20 00:09:44 [error] 271857#271857: *3082598580 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 192.0.2.164, server: tv.example.com, request: "GET /epg/pic/10207420 HTTP/1.1", upstream: "http://10.127.87.5:80/EPGService/hs/xmldata/45c8e816-4e83-4011-80d8-8bc1e0ff68d/pic/10207420", host: "tv.example.com"
+2026/09/20 00:09:45 [error] 3144096#3144096: *14146538178 [client 192.0.2.34] ModSecurity: Access denied with code 403 (phase 2). Matched "Operator `Ge' with parameter `5' against variable `TX:BLOCKING_INBOUND_ANOMALY_SCORE' (Value: `5' ) [file "/var/nginx/anon/aa77431f77_REQUEST-949-BLOCKING-EVALUATION.conf"] [line "222"] [id "949110"] [rev ""] [msg "Inbound Anomaly Score Exceeded… [redacted]"2026/09/20 00:09:46 [crit] 3144098#3144098: *14154600649 rename() "/var/nginx/anon/edad692a2c_0653276284" to "/var/nginx/anon/5d7e201e72_fomin-clinic" failed (20: Not a directory) while reading upstream, client: 198.51.100.220, server: cdn.news.example, request: "GET /geobanners/ HTTP/1.1", upstream: "http://10.219.224.215:80/geobanners/", host: "icdn.example"
+2026/09/20 00:09:47 [error] 271861#271861: *3082683349 client sent too short userid cookie "REDACTED", client: 192.0.2.91, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/658"
+2026/09/20 00:09:48 [error] 271858#271858: *3082596863 client sent too short userid cookie "REDACTED", client: 192.0.2.91, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/2798"
+2026/09/20 00:09:49 [error] 271863#271863: *3082583938 client sent too short userid cookie "REDACTED", client: 192.0.2.91, server: developers.example.com, request: "GET /likes/v1/widget.js HTTP/1.1", host: "developers.example.com", referrer: "https://www.example.test/1884"
+2026/09/20 00:09:50 [error] 271858#271858: disable check peer: 10.238.48.224:8081
+2026/09/20 00:09:51 [error] 271860#271860: enable check peer: 10.238.48.224:8081
+2026/09/20 00:09:52 [error] 271860#271860: disable check peer: 10.62.229.216:8081
+2026/09/20 00:09:53 [error] 271861#271861: disable check peer: 10.163.165.103:8081
+2026/09/20 00:09:54 [error] 271857#271857: enable check peer: 10.62.229.216:8081
+2026/09/20 00:09:55 [error] 271862#271862: *3082998101 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 203.0.113.156, server: embeds.example.com, request: "GET /finance/?start=1788697863&end=1789907463 HTTP/1.1", upstream: "http://10.160.194.250:80/v1/sources/cbr/instruments/?start=1788697863&end=1789907463", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:09:56 [error] 3144096#3144096: *14132921489 connect() failed (111: Connection refused) while connecting to upstream, client: 192.0.2.235, server: err.news.example, request: "OPTIONS /atlas/metrics/ HTTP/2.0", upstream: "http://10.245.58.170:8080/metrics/", host: "err.news.example", referrer: "https://www.news.example/news/2026/09/19/"
+2026/09/20 00:09:57 [error] 271860#271860: enable check peer: 10.163.165.103:8081
+2026/09/20 00:09:58 [error] 271864#271864: disable check peer: 10.163.165.103:8081
+2026/09/20 00:09:59 [error] 271858#271858: enable check peer: 10.163.165.103:8081
+2026/09/20 00:10:00 [warn] 271863#271863: *3083206445 a client request body is buffered to a temporary file /spool/nginx/client/0386026762, client: 10.218.41.141, server: error-pages.example.com, request: "GET /403.html HTTP/1.1", host: "error-pages.example.com"
+2026/09/20 00:10:01 [error] 271860#271860: *3083191741 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:02 [error] 271860#271860: *3083191741 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:03 [error] 271859#271859: *3083147691 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:04 [error] 271859#271859: *3083147691 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:05 [error] 271857#271857: *3083180192 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:06 [error] 271857#271857: *3083180192 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:07 [error] 271860#271860: *3083191741 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:08 [error] 271860#271860: *3083191741 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:09 [error] 271860#271860: *3083191741 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:10 [error] 271860#271860: *3083191741 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:11 [error] 271860#271860: *3083191741 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:12 [error] 271860#271860: *3083191741 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET /lander HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:13 [error] 271857#271857: *3083180192 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:14 [error] 271857#271857: *3083180192 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:15 [error] 271857#271857: *3083180192 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:16 [error] 271857#271857: *3083180192 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:17 [error] 271857#271857: *3083180192 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:18 [error] 271857#271857: *3083180192 access forbidden by rule, client: 192.0.2.3, server: assistant-ext2.example.com, request: "GET / HTTP/1.1", host: "assistant-ext2.example.com"
+2026/09/20 00:10:19 [error] 271859#271859: *3083099312 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 203.0.113.178, server: tv.example.com, request: "GET /epg/pic/3800684 HTTP/1.1", upstream: "http://10.127.87.5:80/EPGService/hs/xmldata/45c8e816-4e83-4011-80d8-8bc1e0ff68d/pic/3800684", host: "tv.example.com"
+2026/09/20 00:10:20 [error] 271861#271861: recv() failed (104: Connection reset by peer)
+2026/09/20 00:10:21 [error] 271862#271862: recv() failed (104: Connection reset by peer)
+2026/09/20 00:10:22 [error] 271860#271860: *3083738231 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 198.51.100.234, server: embeds.example.com, request: "GET /finance/?start=1789304408&end=1789909208 HTTP/1.1", upstream: "http://10.127.149.219:80/v1/sources/cbr/instruments/?start=1789304408&end=1789909208", host: "embeds.example.com", referrer: "https://www.example.com/"
+2026/09/20 00:10:23 [error] 271859#271859: disable check peer: 10.216.188.161:80
+2026/09/20 00:10:24 [error] 271858#271858: disable check peer: 10.216.188.161:80
+2026/09/20 00:10:25 [error] 271864#271864: disable check peer: 10.216.188.161:80
+2026/09/20 00:10:26 [error] 271859#271859: enable check peer: 10.216.188.161:80
+2026/09/20 00:10:27 [error] 271863#271863: enable check peer: 10.216.188.161:80
+2026/09/20 00:10:28 [error] 271861#271861: enable check peer: 10.216.188.161:80
+2026/09/20 00:10:29 [error] 271864#271864: check time out with peer: 10.238.48.224:8081
+2026/09/20 00:10:30 [notice] 179002#179002: reopening logs
+2026/09/20 00:10:31 [notice] 1638#1638: signal 10 (SIGUSR1) received from 232405, reopening logs
+2026/09/20 00:10:32 [warn] 271860#271860: *3084052487 delaying request, excess: 1.000, by zone "tv_limit", client: 198.51.100.254, server: tv.example.com, request: "GET /1125201-991/9b7c74b3-74ae-4974-8bb2-36351876f138/ HTTP/1.1", host: "tv.example.com"
+2026/09/20 00:10:33 [error] 271861#271861: check protocol http error with peer: 10.137.213.164:80
+2026/09/20 00:10:34 [error] 271863#271863: check protocol http error with peer: 10.137.213.164:80
+2026/09/20 00:10:35 [error] 271858#271858: check protocol http error with peer: 10.137.213.164:80
+2026/09/20 00:10:36 [error] 271861#271861: check protocol http error with peer: 10.137.213.164:80
+2026/09/20 00:10:37 [error] 271857#271857: check protocol http error with peer: 10.137.213.164:80
+2026/09/20 00:10:38 [error] 179007#179007: *3063300473 client sent invalid userid cookie "REDACTED"AAAAAEUbr2o/uxMPATxbCwB="" while reading response header from upstream, client: 10.44.100.76, server: skill.example.com, request: "POST /ai-message-store/v1/read/dialog HTTP/1.1", upstream: "http://10.212.156.164:80/v1/read/dialog", host: "skill.example.com"
+2026/09/20 00:10:39 [error] 179007#179007: *3063300473 client sent invalid userid cookie "REDACTED"AAAAAEUbr2o/uxMPAT5bCwB="" while reading response header from upstream, client: 10.44.100.76, server: skill.example.com, request: "POST /ai-message-store/v1/write/complete HTTP/1.1", upstream: "http://10.225.135.251:80/v1/write/complete", host: "skill.example.com"
+2026/09/20 00:10:40 [error] 179007#179007: *3063300473 client sent invalid userid cookie "REDACTED"AAAAAEUbr2o/uxMPAT9bCwB="" while reading response header from upstream, client: 10.44.100.76, server: skill.example.com, request: "POST /ai-message-store/v1/write/metadata HTTP/1.1", upstream: "http://10.133.12.28:80/v1/write/metadata", host: "skill.example.com"
+2026/09/20 00:10:41 [emerg] 14418#14418: dlopen() "/var/nginx/anon/578a21607b_ngx_http_modsecurity_module.so" failed (/etc/nginx/modules/anon_module.so cannot open shared object file: No such file or directory) in /etc/nginx/nginx.conf:16
+2026/09/20 00:10:42 [error] 3995185#3995185: *3980485398 open() "/var/nginx/anon/7142a8f675_lander" failed (2: No such file or directory), client: 198.51.100.254, server: b2b.example.com, request: "GET /lander HTTP/1.1", host: "b2b.example.com"
+2026/09/20 00:10:43 [emerg] 14450#14450: dlopen() "/var/nginx/anon/578a21607b_ngx_http_modsecurity_module.so" failed (/etc/nginx/modules/anon_module.so cannot open shared object file: No such file or directory) in /etc/nginx/nginx.conf:16
