@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include "common/selector.h"
@@ -224,7 +225,8 @@ static int generator_validate_bytecode(const char *script_path, string_tokens *t
 	{
 		string *tok = tokens->str[i];
 		if (token_equals(tok, "counter") || token_equals(tok, "gauge") ||
-		    token_equals(tok, "histogram") || token_equals(tok, "const"))
+		    token_equals(tok, "histogram") || token_equals(tok, "const") ||
+		    token_equals(tok, "text"))
 			has_decl = 1;
 		if (token_equals(tok, "=") || token_equals(tok, "+=") || token_equals(tok, "-=") ||
 		    token_equals(tok, "*=") || token_equals(tok, "/=") || token_equals(tok, "++") ||
@@ -1455,6 +1457,187 @@ static int vm_runtime_test_custom_service(void)
 	return ok;
 }
 
+static int dump_line_starts_with(const char *dump, const char *name)
+{
+	size_t nlen = strlen(name);
+	const char *p = dump;
+	while (p && *p)
+	{
+		if (!strncmp(p, name, nlen) && (p[nlen] == ' ' || p[nlen] == '\0' || p[nlen] == '\n'))
+			return 1;
+		p = strchr(p, '\n');
+		if (!p)
+			break;
+		++p;
+	}
+	return 0;
+}
+
+static int runtime_run_lines(const char *script_path, const char *log_path, alligator_ht **out_vars, amtail_bytecode **out_bc)
+{
+	FILE *logf = fopen(log_path, "r");
+	if (!logf)
+		return 0;
+
+	amtail_log_level amtail_ll = {0};
+	string *src = string_init_dup((char*)script_path);
+	string_tokens *tokens = amtail_lex(src, (char*)script_path, amtail_ll);
+	if (!tokens)
+	{
+		string_free(src);
+		fclose(logf);
+		return 0;
+	}
+	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
+	if (!ast)
+	{
+		string_tokens_free(tokens);
+		string_free(src);
+		fclose(logf);
+		return 0;
+	}
+	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
+	if (!byte_code)
+	{
+		amtail_ast_free(ast);
+		string_tokens_free(tokens);
+		string_free(src);
+		fclose(logf);
+		return 0;
+	}
+
+	alligator_ht *variables = amtail_variables_init();
+	int rc = 1;
+	char *linebuf = NULL;
+	size_t linecap = 0;
+	ssize_t linelen = 0;
+	while ((linelen = getline(&linebuf, &linecap, logf)) != -1)
+	{
+		string *line = string_init_alloc(linebuf, (uint64_t)linelen);
+		int line_rc = amtail_run_file(byte_code, variables, line, log_path, amtail_ll, NULL, NULL, NULL);
+		string_free(line);
+		if (!line_rc)
+		{
+			rc = 0;
+			break;
+		}
+	}
+	free(linebuf);
+	fclose(logf);
+
+	amtail_ast_free(ast);
+	string_tokens_free(tokens);
+	string_free(src);
+
+	if (!rc)
+	{
+		amtail_variables_free(variables);
+		amtail_code_free(byte_code);
+		return 0;
+	}
+	*out_vars = variables;
+	if (out_bc)
+		*out_bc = byte_code;
+	else
+		amtail_code_free(byte_code);
+	return 1;
+}
+
+static int vm_runtime_test_cmp_gt(void)
+{
+	amtail_log_level amtail_ll = {0};
+	const char *script_path = "tests/cmp_gt.mtail";
+	const char *log_line = "start\n";
+
+	string *src = string_init_dup((char*)script_path);
+	string_tokens *tokens = amtail_lex(src, (char*)script_path, amtail_ll);
+	if (!tokens)
+	{
+		string_free(src);
+		return 0;
+	}
+	amtail_ast *ast = amtail_parser(tokens, (char*)script_path, amtail_ll);
+	if (!ast)
+	{
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+	amtail_bytecode *byte_code = amtail_code_generator(ast, amtail_ll);
+	if (!byte_code)
+	{
+		amtail_ast_free(ast);
+		string_tokens_free(tokens);
+		string_free(src);
+		return 0;
+	}
+
+	alligator_ht *variables = amtail_variables_init();
+	string *line = string_init_dup((char*)log_line);
+	int rc = amtail_run(byte_code, variables, line, amtail_ll, NULL, NULL);
+	int ok = rc && runtime_expect_counter(variables, "gt_true", 2);
+
+	string *dump = amtail_variables_format(variables);
+	ok = ok && dump && dump->s && !dump_line_starts_with(dump->s, "n");
+	string_free(dump);
+
+	string_free(line);
+	amtail_variables_free(variables);
+	amtail_code_free(byte_code);
+	amtail_ast_free(ast);
+	string_tokens_free(tokens);
+	string_free(src);
+	return ok;
+}
+
+static int vm_runtime_test_nginx_json(void)
+{
+	alligator_ht *variables = NULL;
+	amtail_bytecode *byte_code = NULL;
+	if (!runtime_run_lines("examples/nginx_json.mtail", "tests/nginx_json.log", &variables, &byte_code))
+		return 0;
+
+	int ok = runtime_expect_counter_key(variables, "http_requests_total[301][][example.com][GET]", 2) &&
+	         runtime_expect_counter_key(variables, "http_requests_total[200][MISS][example.com][GET]", 2) &&
+	         runtime_expect_counter_key(variables, "http_requests_total[200][][embeds.example.com][OPTIONS]", 1) &&
+	         runtime_expect_counter_key(variables, "http_requests_total[200][MISS][fallback.example.com][GET]", 1) &&
+	         runtime_expect_counter_key(variables, "http_bytes_sent_total[301][][example.com][GET]", 1918) &&
+	         runtime_expect_counter_key(variables, "http_bytes_sent_total[200][MISS][example.com][GET]", 12919) &&
+	         runtime_expect_counter_key(variables, "http_bytes_sent_total[200][][embeds.example.com][OPTIONS]", 652) &&
+	         runtime_expect_counter_key(variables, "http_bytes_sent_total[200][MISS][fallback.example.com][GET]", 100) &&
+	         runtime_expect_counter_key(variables, "http_upstream_retries_total[example.com][GET]", 4) &&
+	         runtime_expect_counter_key(variables, "http_upstream_retries_total[embeds.example.com][OPTIONS]", 1) &&
+	         runtime_expect_counter_key(variables, "http_upstream_retries_total[fallback.example.com][GET]", 2) &&
+	         runtime_expect_counter_key(variables, "http_upstream_fallback_total[fallback.example.com][GET]", 1) &&
+	         runtime_expect_absent(variables, "http_upstream_fallback_total[example.com][GET]") &&
+	         runtime_expect_counter_key(variables, "http_upstream_requests_total[10.0.1.239:80][502][example.com]", 2) &&
+	         runtime_expect_counter_key(variables, "http_upstream_requests_total[10.0.1.239:80][200][example.com]", 1) &&
+	         runtime_expect_counter_key(variables, "http_upstream_requests_total[10.0.1.239:80][200][embeds.example.com]", 1) &&
+	         runtime_expect_counter_key(variables, "http_upstream_requests_total[10.0.1.252:80][502][example.com]", 2) &&
+	         runtime_expect_counter_key(variables, "http_upstream_requests_total[10.0.1.253:80][301][example.com]", 2) &&
+	         runtime_expect_counter_key(variables, "http_upstream_requests_total[10.0.1.253:80][200][example.com]", 1) &&
+	         runtime_expect_counter_key(variables, "http_upstream_requests_total[10.0.1.253:80][502][embeds.example.com]", 1) &&
+	         runtime_expect_histogram_key(variables, "http_request_time[example.com][GET]", 4) &&
+	         runtime_expect_histogram_key(variables, "http_request_time[embeds.example.com][OPTIONS]", 1) &&
+	         runtime_expect_histogram_key(variables, "http_upstream_response_time[10.0.1.239:80][example.com]", 3);
+
+	string *dump = amtail_variables_format(variables);
+	ok = ok && dump && dump->s &&
+	     !dump_line_starts_with(dump->s, "i") &&
+	     !dump_line_starts_with(dump->s, "bs") &&
+	     !dump_line_starts_with(dump->s, "ua") &&
+	     !dump_line_starts_with(dump->s, "us") &&
+	     !dump_line_starts_with(dump->s, "urt") &&
+	     !dump_line_starts_with(dump->s, "$ua") &&
+	     !dump_line_starts_with(dump->s, "$addr_groups") &&
+	     !dump_line_starts_with(dump->s, "$addrs");
+	string_free(dump);
+
+	amtail_variables_free(variables);
+	amtail_code_free(byte_code);
+	return ok;
+}
+
 static int vm_runtime_tests(void)
 {
 	int rc_timestamp = vm_runtime_test_timestamp();
@@ -1476,16 +1659,18 @@ static int vm_runtime_tests(void)
 	int rc_zip_unequal = vm_runtime_test_zip_unequal();
 	int rc_zip_empty = vm_runtime_test_zip_empty();
 	int rc_zip_arity = vm_runtime_test_zip_arity_mismatch();
+	int rc_cmp_gt = vm_runtime_test_cmp_gt();
+	int rc_nginx_json = vm_runtime_test_nginx_json();
 	int ok = rc_timestamp && rc_len_strtol && rc_strptime_match &&
 	         rc_tolower && rc_getfilename && rc_getfilename_branch && rc_dual_variables && rc_subst && rc_settime_strptime &&
 	         rc_source && rc_nested && rc_keyed && rc_beanstalkd && rc_custom_service && rc_split &&
-	         rc_zip && rc_zip_unequal && rc_zip_empty && rc_zip_arity;
+	         rc_zip && rc_zip_unequal && rc_zip_empty && rc_zip_arity && rc_cmp_gt && rc_nginx_json;
 	printf("[VM] timestamp=%d len_strtol=%d strptime_match=%d tolower=%d "
 	       "getfilename=%d getfilename_branch=%d dual_variables=%d subst=%d settime_strptime=%d source=%d nested=%d keyed=%d beanstalkd=%d custom_service=%d split=%d "
-	       "zip=%d zip_unequal=%d zip_empty=%d zip_arity=%d\n",
+	       "zip=%d zip_unequal=%d zip_empty=%d zip_arity=%d cmp_gt=%d nginx_json=%d\n",
 	       rc_timestamp, rc_len_strtol, rc_strptime_match, rc_tolower,
 	       rc_getfilename, rc_getfilename_branch, rc_dual_variables, rc_subst, rc_settime_strptime, rc_source, rc_nested, rc_keyed, rc_beanstalkd, rc_custom_service, rc_split,
-	       rc_zip, rc_zip_unequal, rc_zip_empty, rc_zip_arity);
+	       rc_zip, rc_zip_unequal, rc_zip_empty, rc_zip_arity, rc_cmp_gt, rc_nginx_json);
 	if (!ok)
 		printf("[FAIL][VM] runtime feature tests\n");
 	else

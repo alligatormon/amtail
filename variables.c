@@ -8,7 +8,7 @@
 void amtail_variables_dump_foreach(void *funcarg, void* arg)
 {
 	amtail_variable *var = arg;
-	if (var->is_template)
+	if (var->is_template || var->hidden)
 		return;
 
 	string *dst = funcarg;

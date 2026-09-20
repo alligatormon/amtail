@@ -118,6 +118,13 @@ static void compile_regex_for_op(amtail_byteop *op, amtail_log_level amtail_ll)
 	    op->opcode != AMTAIL_AST_OPCODE_NOTMATCH)
 		return;
 
+	/* `i > 0 { }` stores the comparison in li; do not treat "i 0" as a regex. */
+	if (op->opcode == AMTAIL_AST_OPCODE_BRANCH &&
+	    (op->li == AMTAIL_AST_OPCODE_LT || op->li == AMTAIL_AST_OPCODE_LE ||
+	     op->li == AMTAIL_AST_OPCODE_GT || op->li == AMTAIL_AST_OPCODE_GE ||
+	     op->li == AMTAIL_AST_OPCODE_EQ || op->li == AMTAIL_AST_OPCODE_NE))
+		return;
+
 	/* `getfilename() =~ /pattern/` is a filename guard, not a log-line regex. */
 	if (op->opcode == AMTAIL_AST_OPCODE_BRANCH && op->export_name && op->export_name->s)
 	{
@@ -248,6 +255,8 @@ void amtail_code_push(amtail_bytecode *byte_code, amtail_ast *ast, amtail_log_le
 	fill->vartype = ast->vartype;
 	fill->facttype = ast->facttype;
 	fill->hidden = ast->hidden;
+	if (fill->opcode == AMTAIL_AST_OPCODE_BRANCH && ast->ivalue)
+		fill->li = ast->ivalue;
 
 	if (fill->opcode == AMTAIL_AST_OPCODE_RANGE)
 	{

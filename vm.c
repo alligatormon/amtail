@@ -1367,6 +1367,59 @@ void amtail_vmfunc_var_use(amtail_thread *amt_thread, amtail_byteop *byte_ops, a
 		resolved->ld = byte_ops->ld;
 }
 
+static int amtail_vm_cmp_numbers(int64_t opcode, double ln, double rn)
+{
+	switch (opcode)
+	{
+	case AMTAIL_AST_OPCODE_LT: return ln < rn;
+	case AMTAIL_AST_OPCODE_LE: return ln <= rn;
+	case AMTAIL_AST_OPCODE_GT: return ln > rn;
+	case AMTAIL_AST_OPCODE_GE: return ln >= rn;
+	case AMTAIL_AST_OPCODE_NE: return ln != rn;
+	case AMTAIL_AST_OPCODE_EQ:
+	default: return ln == rn;
+	}
+}
+
+static int amtail_vm_cmp_strings(int64_t opcode, const char *ls, const char *rs)
+{
+	int cmp;
+	if (!ls && !rs)
+		cmp = 0;
+	else if (!ls)
+		cmp = -1;
+	else if (!rs)
+		cmp = 1;
+	else
+		cmp = strcmp(ls, rs);
+
+	switch (opcode)
+	{
+	case AMTAIL_AST_OPCODE_LT: return cmp < 0;
+	case AMTAIL_AST_OPCODE_LE: return cmp <= 0;
+	case AMTAIL_AST_OPCODE_GT: return cmp > 0;
+	case AMTAIL_AST_OPCODE_GE: return cmp >= 0;
+	case AMTAIL_AST_OPCODE_NE: return cmp != 0;
+	case AMTAIL_AST_OPCODE_EQ:
+	default: return cmp == 0;
+	}
+}
+
+static int amtail_vm_token_truthy(const char *token, alligator_ht *variables, amtail_thread *t)
+{
+	if (!token || !*token)
+		return 0;
+
+	double num = 0;
+	if (amtail_vm_token_to_number(token, variables, t, &num))
+		return num != 0;
+
+	char *s = amtail_vm_lookup_variable_string(token, variables, t);
+	int rc = s && *s;
+	free(s);
+	return rc;
+}
+
 static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byteop *byte_ops, alligator_ht *variables, amtail_log_level amtail_ll)
 {
 	if (!byte_ops)
@@ -1393,6 +1446,7 @@ static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byt
 		return rc;
 	}
 
+	int64_t cmp_op = byte_ops->li;
 	char *lhs = NULL, *rhs = NULL;
 	if (byte_ops->export_name && byte_ops->export_name->s &&
 	    amtail_vm_extract_binary_operands(byte_ops->export_name->s, &lhs, &rhs))
@@ -1401,16 +1455,20 @@ static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byt
 		int matched = 0;
 		if (amtail_vm_token_to_number(lhs, variables, amt_thread, &ln) &&
 		    amtail_vm_token_to_number(rhs, variables, amt_thread, &rn))
-			matched = (ln == rn);
+			matched = amtail_vm_cmp_numbers(cmp_op, ln, rn);
 		else
 		{
 			char *ls = amtail_vm_eval_condition_lhs(lhs, variables, amt_thread);
 			if (amtail_vm_rhs_is_slash_regex(rhs))
+			{
 				matched = amtail_vm_string_slash_regex_match(ls, rhs, amtail_ll);
+				if (cmp_op == AMTAIL_AST_OPCODE_NE || cmp_op == AMTAIL_AST_OPCODE_NOTMATCH)
+					matched = !matched;
+			}
 			else
 			{
 				char *rs = amtail_vm_token_to_string(rhs, variables, amt_thread);
-				matched = (ls && rs && strcmp(ls, rs) == 0);
+				matched = amtail_vm_cmp_strings(cmp_op, ls, rs);
 				free(rs);
 			}
 			free(ls);
@@ -1419,6 +1477,9 @@ static int amtail_vm_branch_condition_true(amtail_thread *amt_thread, amtail_byt
 		free(rhs);
 		return matched;
 	}
+
+	if (byte_ops->export_name && byte_ops->export_name->s)
+		return amtail_vm_token_truthy(byte_ops->export_name->s, variables, amt_thread);
 	return 0;
 }
 

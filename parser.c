@@ -721,6 +721,15 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 				continue;
 			}
 
+			/* `{` turns a comparison into BRANCH; keep the operator in ivalue. */
+			if (cur->opcode == AMTAIL_AST_OPCODE_LT ||
+			    cur->opcode == AMTAIL_AST_OPCODE_LE ||
+			    cur->opcode == AMTAIL_AST_OPCODE_GT ||
+			    cur->opcode == AMTAIL_AST_OPCODE_GE ||
+			    cur->opcode == AMTAIL_AST_OPCODE_EQ ||
+			    cur->opcode == AMTAIL_AST_OPCODE_NE)
+				cur->ivalue = cur->opcode;
+
 			++identy;
 			cur->opcode = AMTAIL_AST_OPCODE_BRANCH;
 			pstate.branch = 0;
@@ -814,6 +823,12 @@ amtail_ast* amtail_parser(string_tokens *tokens, char *name, amtail_log_level am
 			cur->opcode = AMTAIL_AST_OPCODE_VARIABLE;
 			cur->vartype = ALLIGATOR_VARTYPE_CONST;
 			cur->hidden = 1;
+			continue;
+		}
+		if (!strcmp(t, "text"))
+		{
+			cur->opcode = AMTAIL_AST_OPCODE_VARIABLE;
+			cur->vartype = ALLIGATOR_VARTYPE_TEXT;
 			continue;
 		}
 
